@@ -31,6 +31,18 @@ void checkCUDAError(const char *msg, int line = -1) {
   }
 }
 
+void printArray(int n, float *a, bool abridged = false) {
+	printf("    [ ");
+	for (int i = 0; i < n; i++) {
+		if (abridged && i + 2 == 15 && n > 16) {
+			i = n - 2;
+			printf("... ");
+		}
+		printf("%3d ", a[i]);
+	}
+	printf("]\n");
+}
+
 
 /*****************
 * Configuration *
@@ -71,6 +83,10 @@ glm::vec3 *dev_vel1;
 glm::vec3 *dev_vel2;
 
 
+//float *inp = new float[numObjects];
+
+
+
 // LOOK-2.1 - these are NOT allocated for you. You'll have to set up the thrust
 // pointers on your own too.
 
@@ -83,6 +99,8 @@ thrust::device_ptr<int> dev_thrust_particleGridIndices;
 
 int *dev_gridCellStartIndices; // What part of dev_particleArrayIndices belongs
 int *dev_gridCellEndIndices;   // to this cell?
+
+
 
 // TODO-2.3 - consider what additional buffers you might need to reshuffle
 // the position and velocity data to be coherent within cells.
@@ -134,13 +152,14 @@ __global__ void kernGenerateRandomPosArray(int time, int N, glm::vec3 * arr, flo
     arr[index].x = scale * rand.x;
     arr[index].y = scale * rand.y;
     arr[index].z = scale * rand.z;
+
   }
 }
 
 /**
 * Initialize memory, update some globals
 */
-void Boids::initSimulation(int N) {
+void scanmatch::initSimulation(int N) {
 	numObjects = N;
 	dim3 fullBlocksPerGrid((N + blockSize - 1) / blockSize);
 
@@ -154,6 +173,20 @@ void Boids::initSimulation(int N) {
 
 	cudaMalloc((void**)&dev_vel2, N * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMalloc dev_vel2 failed!");
+
+	//float inp = 0.0;
+
+	//float inp[numObjects] = {};
+	//float *inp = new float[numObjects];
+	//memset(inp, 0.0f, numObjects);
+
+	//inp[0] = 0.0f;
+	//for (int i = 1; i < numObjects; i++) {
+		//inp[i] = 0.0f;
+		//inp[i] = inp[i - 1] + (2.0f / float (numObjects - 1));
+	//}
+
+	//printArray(numObjects, inp);
 
 	// LOOK-1.2 - This is a typical CUDA kernel invocation.
 	kernGenerateRandomPosArray << <fullBlocksPerGrid, blockSize >> > (1, numObjects,
@@ -235,7 +268,7 @@ __global__ void kernCopyVelocitiesToVBO(int N, glm::vec3 *vel, float *vbo, float
 /**
 * Wrapper for call to the kernCopyboidsToVBO CUDA kernel.
 */
-void Boids::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) {
+void scanmatch::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities) {
   dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
 
   kernCopyPositionsToVBO << <fullBlocksPerGrid, blockSize >> >(numObjects, dev_pos, vbodptr_positions, scene_scale);
@@ -681,7 +714,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 	/**
 	* Step the entire N-body simulation by `dt` seconds.
 	*/
-	void Boids::stepSimulationNaive(float dt) {
+	void scanmatch::stepSimulationNaive(float dt) {
 		dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
 
 		kernUpdateVelocityBruteForce << <fullBlocksPerGrid, blockSize >> > (numObjects, dev_pos, dev_vel1, dev_vel2);
@@ -694,7 +727,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 		// TODO-1.2 ping-pong the velocity buffers
 	}
 
-	void Boids::stepSimulationScatteredGrid(float dt) {
+	void scanmatch::stepSimulationScatteredGrid(float dt) {
 
 		dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
 		dim3 fullBlocksPerGrid_gridsize((gridCellCount + blockSize - 1) / blockSize);
@@ -739,7 +772,7 @@ __global__ void kernUpdateVelNeighborSearchCoherent(
 	  // - Ping-pong buffers as needed
 	}
 
-void Boids::stepSimulationCoherentGrid(float dt) {
+void scanmatch::stepSimulationCoherentGrid(float dt) {
 
 	dim3 fullBlocksPerGrid((numObjects + blockSize - 1) / blockSize);
 	dim3 fullBlocksPerGrid_gridsize((gridCellCount + blockSize - 1) / blockSize);
@@ -805,7 +838,7 @@ void Boids::stepSimulationCoherentGrid(float dt) {
   // - Ping-pong buffers as needed. THIS MAY BE DIFFERENT FROM BEFORE.
 }
 
-void Boids::endSimulation() {
+void scanmatch::endSimulation() {
   cudaFree(dev_vel1);
   cudaFree(dev_vel2);
   cudaFree(dev_pos);
@@ -819,7 +852,7 @@ void Boids::endSimulation() {
   // TODO-2.1 TODO-2.3 - Free any additional buffers here.
 }
 
-void Boids::unitTest() {
+void scanmatch::unitTest() {
   // LOOK-1.2 Feel free to write additional tests here.
 
   // test unstable sort

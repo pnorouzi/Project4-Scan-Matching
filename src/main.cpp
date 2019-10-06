@@ -15,21 +15,21 @@
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
 #define UNIFORM_GRID 1
-#define COHERENT_GRID 1
+#define COHERENT_GRID 0
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 75000;
+const int N_FOR_VIS = 7500;
 const float DT = 0.2f;
 
 /**
 * C main function.
 */
 int main(int argc, char* argv[]) {
-  projectName = "565 CUDA Intro: Boids";
+  projectName = "565 CUDA Scan Match";
 
   if (init(argc, argv)) {
     mainLoop();
-    Boids::endSimulation();
+	scanmatch::endSimulation();
     return 0;
   } else {
     return 1;
@@ -109,7 +109,7 @@ bool init(int argc, char **argv) {
   cudaGLRegisterBufferObject(boidVBO_velocities);
 
   // Initialize N-body simulation
-  Boids::initSimulation(N_FOR_VIS);
+  scanmatch::initSimulation(N_FOR_VIS);
 
   updateCamera();
 
@@ -197,15 +197,15 @@ void initShaders(GLuint * program) {
 
     // execute the kernel
     #if UNIFORM_GRID && COHERENT_GRID
-    Boids::stepSimulationCoherentGrid(DT);
+	scanmatch::stepSimulationCoherentGrid(DT);
     #elif UNIFORM_GRID
-    Boids::stepSimulationScatteredGrid(DT);
+	scanmatch::stepSimulationScatteredGrid(DT);
     #else
-    Boids::stepSimulationNaive(DT);
+	scanmatch::stepSimulationNaive(DT);
     #endif
 
     #if VISUALIZE
-    Boids::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
+	scanmatch::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
     #endif
     // unmap buffer object
     cudaGLUnmapBufferObject(boidVBO_positions);
@@ -217,7 +217,7 @@ void initShaders(GLuint * program) {
     double timebase = 0;
     int frame = 0;
 
-    Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
+	scanmatch::unitTest(); // LOOK-1.2 We run some basic example code to make sure
                        // your CUDA development setup is ready to go.
 
     while (!glfwWindowShouldClose(window)) {

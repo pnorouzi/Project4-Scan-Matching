@@ -9,7 +9,7 @@
 #include <cmath>
 #include <vector>
 
-namespace Boids {
+namespace scanmatch {
     void initSimulation(int N);
     void stepSimulationNaive(float dt);
     void stepSimulationScatteredGrid(float dt);
