@@ -10,7 +10,7 @@
 #include <vector>
 
 namespace scanmatch {
-	namespace CPU {
+	namespace GPU {
 
 		void initSimulation(int N_first, int N_second,float *first,float *second);
 	    void findCorrespondence(float dt);
