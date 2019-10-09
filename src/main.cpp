@@ -7,6 +7,9 @@
 */
 
 #include "main.hpp"
+#include <iostream>
+#include <vector>
+#include <string>
 
 // ================
 // Configuration
@@ -15,7 +18,7 @@
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
 #define CPU 0
-#define GPU 0
+#define GPU 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 const float DT = 0.2f;
@@ -23,13 +26,13 @@ const float DT = 0.2f;
 
 int N_first; 
 int N_second;
-vector<float> first_points;
-vector<float> second_points;
-glm::vec3 *dev_pos;
+
+glm::vec3 *first_points;
+glm::vec3 *second_points;
 
 const float DT = 0.2f;
 
-void readPlyfile(std::string plyfile, int* num_points, vector<float>& points) {
+void readPlyfile(std::string plyfile, int* num_points, glm::vec3* points) {
   std::ifstream myfile(plyfile);
   if (!myfile.is_open())
   {
@@ -53,12 +56,17 @@ void readPlyfile(std::string plyfile, int* num_points, vector<float>& points) {
         } while (count++ < 2);
       }
     } while (myString != "end_header");
-
+	//std::string*)std::malloc(4 * sizeof(std::string)
+	points = (glm::vec3*)malloc(*num_points * sizeof(glm::vec3));
     int i = 0;
     while (i < *num_points) {
       getline(myfile, myString);
-      vector<string> tokens = utilityCore::tokenizeString(myString);
-      points.push_back(glm::vec3(atof(tokens[0].c_str()),atof(tokens[1].c_str()),atof(tokens[2].c_str())))
+	  std::vector<std::string> tokens = utilityCore::tokenizeString(myString);
+
+	  points[i].x = atof(tokens[0].c_str());
+	  points[i].y = atof(tokens[1].c_str());
+	  points[i].z = atof(tokens[2].c_str());
+
       i++;
     }
   }
@@ -69,16 +77,16 @@ void readPlyfile(std::string plyfile, int* num_points, vector<float>& points) {
 */
 int main(int argc, char* argv[]) {
   projectName = "Project 4: Scan Matching";
-  readPlyfile("bunny\\data\\bun045.ply", &N_first, first_points);
-  readPlyfile("bunny\\data\\bun000.ply", &N_second, second_points);
+  readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun045.ply", &N_first, first_points);
+  readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun000.ply", &N_second, second_points);
   
   if (init(N_first, N_second, first_points, second_points)) {
     mainLoop(N_first, N_second, first_points, second_points);
 
 #if CPU
-  scanmatching::CPU::endSimulation();
+  scanmatch::endSimulation();
 #elif GPU
-  scanmatching::GPU::endSimulation();
+  scanmatch::endSimulation();
 #endif
 
     return 0;
@@ -97,7 +105,7 @@ GLFWwindow *window;
 /**
 * Initialization of CUDA and GLFW.
 */
-bool init(int N_first, int N_second, vector<float>& first_points, vector<float>& second_points) {
+bool init(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
   cudaDeviceProp deviceProp;
   int gpuDevice = 0;
   int device_count = 0;
@@ -244,7 +252,7 @@ void initShaders(GLuint * program) {
 //====================================
 // Main loop
 //====================================
-void runCUDA(int N_first, int N_second, vector<float>& first_points, vector<float>& second_points) {
+void runCUDA(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
   // Map OpenGL buffer object for writing from CUDA on a single GPU
   // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
   // use this buffer
@@ -274,7 +282,7 @@ void runCUDA(int N_first, int N_second, vector<float>& first_points, vector<floa
   cudaGLUnmapBufferObject(boidVBO_velocities);
 }
 
-void mainLoop(int N_first, int N_second, vector<float>& first_points, vector<float>& second_points) {
+void mainLoop(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
   double fps = 0;
   double timebase = 0;
   int frame = 0;
@@ -294,7 +302,7 @@ void mainLoop(int N_first, int N_second, vector<float>& first_points, vector<flo
       frame = 0;
     }
 
-    runCUDA(int N_first, int N_second, vector<float>& first_points, vector<float>& second_points);
+    runCUDA(N_first, N_second,first_points, second_points);
 
     std::ostringstream ss;
     ss << "[";

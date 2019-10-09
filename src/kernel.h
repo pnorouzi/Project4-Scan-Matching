@@ -10,17 +10,9 @@
 #include <vector>
 
 namespace scanmatch {
-	namespace CPU {
-
-		void initSimulation(int N_first, int N_second,float *first,float *second);
-	    void findCorrespondence(float dt);
-	    void stepSimulationScatteredGrid(float dt);
-	    void stepSimulationCoherentGrid(float dt);
-	    void copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities);
-
-	    void endSimulation();
-	    void unitTest();
-
-	}
-   
+		void copyToDevice(int N1, int N2, float* xpoints, float* ypoints);
+		void initSimulation(int N1, int N2, float* xpoints, float* ypoints);
+		void copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities);
+		float* getDevPos();
+		void endSimulation();
 }

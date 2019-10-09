@@ -65,6 +65,12 @@ set(headers
     src/cudaMat4.hpp
     src/glslUtility.hpp
     src/kernel.h
+    src/CPU_kernel.h
+    src/GPU_kernel.h
+    src/GPU_kernel_tree.h
+    src/svd3.h
+    src/svd3_cuda.h
+    src/utilities.h
     src/main.hpp
     src/utilityCore.hpp
     )
@@ -72,6 +78,10 @@ set(headers
 set(sources
     src/glslUtility.cpp
     src/kernel.cu
+    src/CPU_kernel.cpp
+    src/GPU_kernel.cu
+    src/GPU_kernel_tree.cu
+    src/utilities.cpp
     src/main.cpp
     src/utilityCore.cpp
     )

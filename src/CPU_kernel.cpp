@@ -10,11 +10,16 @@
 #include <vector>
 
 namespace scanmatch {
-	namespace GPU {
+	namespace CPU {
 
 		void initSimulation(int N_first, int N_second,float *first,float *second);
+	    void findCorrespondence(float dt);
+	    void stepSimulationScatteredGrid(float dt);
+	    void stepSimulationCoherentGrid(float dt);
+	    void copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities);
 
-		void run(int N_first, int N_second);
+	    void endSimulation();
+	    void unitTest();
 
 	}
    
