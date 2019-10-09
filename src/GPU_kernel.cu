@@ -13,6 +13,18 @@
 
 #define checkCUDAErrorWithLine(msg) checkCUDAError(msg, __LINE__)
 
+
+void checkCUDAError(const char *msg, int line = -1) {
+	cudaError_t err = cudaGetLastError();
+	if (cudaSuccess != err) {
+		if (line >= 0) {
+			fprintf(stderr, "Line %d: ", line);
+		}
+		fprintf(stderr, "Cuda error: %s: %s.\n", msg, cudaGetErrorString(err));
+		exit(EXIT_FAILURE);
+	}
+}
+
 #define blockSize 128
 
 
@@ -230,7 +242,7 @@ void scanmatch::GPU::run(int N_first, int N_second) {
 
 	cudaMalloc((void**)&dev_B_svds, N_first * sizeof(glm::mat3));
 
-	multiply_transpose << <numBlocks_first, blockSize >> > (N_first, dev_mean_first, dev_mean_corr, dev_B_svds);
+	multiply_transpose << <numBlocks_first, blockSize >> > (N_first, dev_centered_first, dev_centered_corr, dev_B_svds);
 
 	//glm::mat3 *dev_W;
 
@@ -273,7 +285,7 @@ void scanmatch::GPU::run(int N_first, int N_second) {
 	cudaMemcpy(dev_trans, &host_trans, sizeof(glm::mat3), cudaMemcpyHostToDevice);
 
 
-	update << <numBlocks_first, blockSize >> > (N_first, dev_first, dev_rot, dev_trans, dev_first_buf);
+	update << <numBlocks_first, blockSize >> > (N_first, dev_first, *dev_rot, *dev_trans, dev_first_buf);
 
 	cudaMemcpy(dev_first, dev_first_buf, N_first * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
 }

@@ -71,6 +71,7 @@ set(headers
     src/utilities.h
     src/main.hpp
     src/utilityCore.hpp
+    src/CPU_kernel.h
     )
 
 set(sources
@@ -80,6 +81,7 @@ set(sources
     src/utilities.cpp
     src/main.cpp
     src/utilityCore.cpp
+    src/CPU_kernel.cpp
     )
 
 list(SORT headers)
