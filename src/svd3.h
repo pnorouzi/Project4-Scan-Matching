@@ -33,18 +33,18 @@ http://www.lomont.org/Math/Papers/2003/InvSqrt.pdf
 http://playstation2-linux.com/download/p2lsd/fastrsqrt.pdf
 http://www.beyond3d.com/content/articles/8/
 */
-inline float rsqrt(float x) {
+//inline float rsqrt(float x) {
 // int ihalf = *(int *)&x - 0x00800000; // Alternative to next line,
 // float xhalf = *(float *)&ihalf;      // for sufficiently large nos.
-   float xhalf = 0.5f*x;
-   int i = *(int *)&x;          // View x as an int.
+  // float xhalf = 0.5f*x;
+  // int i = *(int *)&x;          // View x as an int.
 // i = 0x5f3759df - (i >> 1);   // Initial guess (traditional).
-   i = 0x5f375a82 - (i >> 1);   // Initial guess (slightly better).
-   x = *(float *)&i;            // View i as float.
-   x = x*(1.5f - xhalf*x*x);    // Newton step.
+  // i = 0x5f375a82 - (i >> 1);   // Initial guess (slightly better).
+  // x = *(float *)&i;            // View i as float.
+  // x = x*(1.5f - xhalf*x*x);    // Newton step.
 // x = x*(1.5008908 - xhalf*x*x);  // Newton step for a balanced error.
-   return x;
-}
+  // return x;
+//}
 
 /* This is rsqrt with an additional step of the Newton iteration, for
 increased accuracy. The constant 0x5f37599e makes the relative error

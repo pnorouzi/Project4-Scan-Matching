@@ -17,8 +17,8 @@
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
-#define CPU_on 0
-#define GPU_on 1
+#define CPU_on 1
+#define GPU_on 0
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 const float DT = 0.2f;
@@ -258,8 +258,8 @@ void runCUDA(int N_first, int N_second, glm::vec3* first_points, glm::vec3* seco
 
 // DO THIS
 #if CPU_on
-  ScanMatching::CPU::icp(xpoints, ypoints, N_first, N_second);
-  ScanMatching::copyToDevice(N1, N2, xpoints, ypoints);
+  scanmatch::CPU::run(N_first, N_second, first_points, second_points);
+  scanmatch::copyToDevice(N_first, N_second, *first_points, *second_points);
 #elif GPU_on
   scanmatch::GPU::run(N_first, N_second);
 #endif

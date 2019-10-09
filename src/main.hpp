@@ -15,6 +15,7 @@
 #include "glslUtility.hpp"
 #include "kernel.h"
 #include "GPU_kernel.h"
+#include "CPU_kernel.h"
 
 //====================================
 // GL Stuff

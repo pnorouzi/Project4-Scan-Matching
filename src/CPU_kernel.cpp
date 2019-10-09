@@ -28,7 +28,8 @@ void checkCUDAError(const char *msg, int line = -1) {
 #define blockSize 128
 
 
-
+glm::vec3* dev_first;
+glm::vec3* dev_second;
 
 glm::vec3 findmatch(int N_first, int N_second, glm::vec3* first, glm::vec3* second) {
 	
@@ -56,29 +57,23 @@ glm::vec3 findmatch(int N_first, int N_second, glm::vec3* first, glm::vec3* seco
 	return *corr;
 }
 
-glm::vec3 find_mean_and_sub(int n, glm::vec3 *idata) {
+void find_mean_and_sub(int n, glm::vec3 *idata, glm::vec3 *host_mean, glm::vec3 *host_centered) {
 
-	glm::vec3 mean(0.0f, 0.0f, 0.0f);
-	//glm::vec3 *mean = new glm::vec3[1];
-	glm::vec3 *odata;
-	glm::vec3 *odata = new glm::vec3[n];
-	*odata = *idata;
+	*host_centered = *idata;
 
 	for (int i = 0; i < n; i++) {
 		
-		mean += idata[i];
+		*host_mean += idata[i];
 	}
 	
-	mean /= n;
+	*host_mean /= n;
 
 
 
 	for (int i = 0; i < n; i++) {
-		odata[i] -= mean;
+		host_centered[i] -= host_mean;
 	}
 	
-	
-	return *odata;
 }
 
 glm::mat3 multiply_transpose(int n, glm::vec3* first, glm::vec3* corr) {
@@ -104,12 +99,22 @@ glm::mat3 multiply_transpose(int n, glm::vec3* first, glm::vec3* corr) {
 	return W;
 }
 
-__global__ void update(int N_first, glm::vec3 *dev_first, glm::mat3 dev_rot, glm::vec3 dev_trans, glm::vec3* dev_first_buf) {
-	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (index >= N_first)
-		return;
+glm::vec3 update(int N_first, glm::vec3 *host_first, glm::mat3 dev_rot, glm::vec3 dev_trans) {
+	
+	glm::vec3 *host_first_buf;
 
-	dev_first_buf[index] = dev_rot * dev_first[index] + dev_trans;
+	glm::vec3 *host_first_buf = new glm::vec3[N_first];
+
+	*host_first_buf = *host_first;
+
+	for (int i = 0; i < N_first; i++) {
+		host_first_buf[i] = (dev_rot * host_first[i]) + dev_trans;
+	}
+	
+	
+	return *host_first_buf;
+
+
 }
 /*
 // Multiply the arrays A and B on GPU and save the result in C
@@ -157,17 +162,37 @@ __global__ void find_svd(glm::mat3 &w, glm::mat3 &u, glm::mat3 &s, glm::mat3 &v)
 		v[0][0], v[0][1], v[0][2], v[1][0], v[1][1], v[1][2], v[2][0], v[2][1], v[2][2]);
 }
 */
+
+void scanmatch::CPU::initSimulation(int N_first, int N_second, glm::vec3* first, glm::vec3* second) {
+	cudaMalloc((void**)&dev_first, N_first * sizeof(glm::vec3));
+	checkCUDAErrorWithLine("cudaMalloc dev_first failed!");
+	cudaMemcpy(dev_first, first, sizeof(glm::vec3) * N_first, cudaMemcpyHostToDevice);
+
+	cudaMalloc((void**)&dev_second, N_second * sizeof(glm::vec3));
+	checkCUDAErrorWithLine("cudaMalloc dev_second failed!");
+	cudaMemcpy(dev_second, second, sizeof(glm::vec3) * N_second, cudaMemcpyHostToDevice);
+
+}
 void scanmatch::CPU::run(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
 
 
 	glm::vec3 host_corr = findmatch(N_first, N_second, first_points, second_points);
 	
+	glm::vec3 host_mean_first(0.0f, 0.0f, 0.0f);
+	glm::vec3 host_mean_corr(0.0f, 0.0f, 0.0f);
+	//glm::vec3 *mean = new glm::vec3[1];
+	glm::vec3 *host_centered_first;
+	glm::vec3 *host_centered_first = new glm::vec3[N_first];
+	//*host_centered_first = *first_points;
 
+	glm::vec3 *host_centered_corr;
+	glm::vec3 *host_centered_corr = new glm::vec3[N_first];
+	//*host_centered_corr = host_corr;
 	
-	glm::vec3 host_centered_first = find_mean_and_sub(N_first, first_points);
-	glm::vec3 host_centered_corr = find_mean_and_sub(N_first, &host_corr);
+	find_mean_and_sub(N_first, first_points, &host_mean_first, host_centered_first);
+	find_mean_and_sub(N_first, &host_corr, &host_mean_corr, host_centered_corr);
 
-	glm::mat3 W = multiply_transpose(N_first, &host_centered_first, &host_centered_corr);
+	glm::mat3 W = multiply_transpose(N_first, host_centered_first, host_centered_corr);
 
 	glm::mat3 U;
 	glm::mat3 S;
@@ -182,9 +207,16 @@ void scanmatch::CPU::run(int N_first, int N_second, glm::vec3* first_points, glm
 	glm::mat3 host_Vt(glm::vec3(V[0][0], V[0][1], V[0][2]), glm::vec3(V[1][0], V[1][1], V[1][2]), glm::vec3(V[2][0], V[2][1], V[2][2]));
 
 	glm::mat3 host_rot = host_U * host_Vt;
-	glm::vec3 host_trans = host_mean_corr[0] - host_rot * host_mean_first[0];
+	glm::vec3 host_trans = host_mean_corr - host_rot * host_mean_first;
+
+	glm::vec3 new_buf =  update(N_first, first_points, host_rot, host_trans);
+
+	cudaMemcpy(first_points, &new_buf, N_first * sizeof(glm::vec3), cudaMemcpyHostToHost);
+}
 
 
+void scanmatch::CPU::host_to_dev(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
 
-	cudaMemcpy(dev_first, dev_first_buf, N_first * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
+	cudaMemcpy(dev_first, first_points, N_first * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_second, second_points, N_first * sizeof(glm::vec3), cudaMemcpyHostToDevice);
 }
