@@ -5,7 +5,7 @@
 #include <cublas_v2.h>
 #include <fstream>
 #include <glm/glm.hpp>
-#include "svd3_cuda.h"
+#include "svd3.h"
 #include "kernel.h"
 #include "device_launch_parameters.h"
 #include "GPU_kernel.h"
@@ -138,6 +138,14 @@ __global__ void multiply_transpose(int n, glm::vec3* dev_first, glm::vec3* dev_s
 	out[index] = glm::outerProduct(dev_first[index], dev_second[index]);
 }
 
+__global__ void update(int N_first, glm::vec3 *, glm::mat3 R, glm::vec3 trans) {
+	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (index >= N_first)
+		return;
+
+	dev_pos[index] = R * dev_pos[index] + trans;
+}
+
 // Multiply the arrays A and B on GPU and save the result in C
 // C(m,n) = A(m,k) * B(k,n)
 void gpu_blas_mmul(cublasHandle_t &handle, const float *A, const float *B, float *C, const int m, const int k, const int n) {
@@ -173,11 +181,12 @@ __global__ void setValueOnDevice(float* device_var, int val) {
 	*device_var = val;
 }
 
-__global__ void find_svd(float* w, float* u, float* s, float* v) {
-	svd(w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8],
-		u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7], u[8],
-		s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7], s[8],
-		v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]);
+__global__ void find_svd(glm::mat3 &w, glm::mat3 &u, glm::mat3 &s, glm::mat3 &v) {
+
+	svd(w[0][0], w[0][1], w[0][2], w[1][0], w[1][1], w[1][2], w[2][0], w[2][1], w[2][2],
+		u[0][0], u[0][1], u[0][2], u[1][0], u[1][1], u[1][2], u[2][0], u[2][1], u[2][2],
+		s[0][0], s[0][1], s[0][2], s[1][0], s[1][1], s[1][2], s[2][0], s[2][1], s[2][2],
+		v[0][0], v[0][1], v[0][2], v[1][0], v[1][1], v[1][2], v[2][0], v[2][1], v[2][2]);
 }
 
 void scanmatch::GPU::run(int N_first, int N_second) {
@@ -222,23 +231,36 @@ void scanmatch::GPU::run(int N_first, int N_second) {
 	
 	glm::mat3 W = thrust::reduce(thrust::device, dev_B_svds, dev_B_svds + N_first, glm::mat3(0));
 
-	glm::mat3 *dev_W;
-	glm::mat3 *dev_U;
-	glm::mat3 *dev_S;
-	glm::mat3 *dev_V;
+	//glm::mat3 *dev_W;
+	//glm::mat3 U;
+	//glm::mat3 S;
+	//glm::mat3 V;
 
-	cudaMalloc((void**)&dev_W, sizeof(glm::mat3));
+	//cudaMalloc((void**)&dev_W, sizeof(glm::mat3));
 
-	cudaMemcpy(dev_W, &W, sizeof(glm::mat3), cudaMemcpyHostToDevice);
+	//cudaMemcpy(dev_W, &W, sizeof(glm::mat3), cudaMemcpyHostToDevice);
 
-	//float U[3][3] = { 0 };
-	//float S[3][3] = { 0 };
-	//float V[3][3] = { 0 };
+	float U[3][3] = { 0 };
+	float S[3][3] = { 0 };
+	float V[3][3] = { 0 };
+	
+	svd(W[0][0], W[0][1], W[0][2], W[1][0], W[1][1], W[1][2], W[2][0], W[2][1], W[2][2],
+		U[0][0], U[0][1], U[0][2], U[1][0], U[1][1], U[1][2], U[2][0], U[2][1], U[2][2],
+		S[0][0], S[0][1], S[0][2], S[1][0], S[1][1], S[1][2], S[2][0], S[2][1], S[2][2],
+		V[0][0], V[0][1], V[0][2], V[1][0], V[1][1], V[1][2], V[2][0], V[2][1], V[2][2]);
 
-	get_svd(dev_W, dev_U, dev_S, dev_V);
 
-	glm::mat3 g_U(glm::vec3(U[0][0], U[1][0], U[2][0]), glm::vec3(U[0][1], U[1][1], U[2][1]), glm::vec3(U[0][2], U[1][2], U[2][2]));
-	glm::mat3 g_Vt(glm::vec3(V[0][0], V[0][1], V[0][2]), glm::vec3(V[1][0], V[1][1], V[1][2]), glm::vec3(V[2][0], V[2][1], V[2][2]));
+	glm::mat3 host_U(glm::vec3(U[0][0], U[1][0], U[2][0]), glm::vec3(U[0][1], U[1][1], U[2][1]), glm::vec3(U[0][2], U[1][2], U[2][2]));
+	glm::mat3 host_Vt(glm::vec3(V[0][0], V[0][1], V[0][2]), glm::vec3(V[1][0], V[1][1], V[1][2]), glm::vec3(V[2][0], V[2][1], V[2][2]));
+
+	glm::vec3 *host_mean_first = new glm::vec3[1];
+	glm::vec3 *host_mean_corr = new glm::vec3[1];
+
+	cudaMemcpy(host_mean_first, dev_mean_first, sizeof(glm::vec3), cudaMemcpyDeviceToHost);
+	cudaMemcpy(host_mean_corr, dev_mean_corr, sizeof(glm::vec3), cudaMemcpyDeviceToHost);
+
+	glm::mat3 R = host_U * host_Vt;
+	glm::vec3 t = host_mean_corr[0] - R * host_mean_first[0];
 
 }
 
