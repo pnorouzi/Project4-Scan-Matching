@@ -10,8 +10,8 @@
 #include <vector>
 
 namespace scanmatch {
-		void copyToDevice(int N1, int N2, float* xpoints, float* ypoints);
-		void initSimulation(int N1, int N2, float* xpoints, float* ypoints);
+		void copyToDevice(int N_first, int N_second, glm::vec3 first_points, glm::vec3 second_points);
+		void initSimulation(int N_first, int N_second, glm::vec3 first_points, glm::vec3 second_points);
 		void copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velocities);
 		float* getDevPos();
 		void endSimulation();

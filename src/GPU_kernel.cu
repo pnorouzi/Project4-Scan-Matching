@@ -18,17 +18,22 @@
 
 
 glm::vec3* dev_first;
+glm::vec3* dev_first_buf;
 glm::vec3* dev_second;
 glm::vec3* dev_corr;
 glm::mat3* dev_rot;
 glm::vec3* dev_trans;
 
 
-void scanmatch::GPU::initSimulation(int N_first, int N_second,float *first,float *second) {
+void scanmatch::GPU::initSimulation(int N_first, int N_second, glm::vec3 *first, glm::vec3 *second) {
 
 	cudaMalloc((void**)&dev_first, N_first * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMalloc dev_first failed!");
 	cudaMemcpy(dev_first, first, sizeof(glm::vec3) * N_first, cudaMemcpyHostToDevice);
+
+	cudaMalloc((void**)&dev_first, N_first * sizeof(glm::vec3));
+	checkCUDAErrorWithLine("cudaMalloc dev_second failed!");
+	cudaMemcpy(dev_first_buf, first, sizeof(glm::vec3) * N_first, cudaMemcpyHostToDevice);
 
 	cudaMalloc((void**)&dev_second, N_second * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMalloc dev_second failed!");
@@ -121,7 +126,7 @@ void find_mean_vec(int n, glm::vec3 *dev_idata, glm::vec3 *dev_mean) {
 __global__ void Subtract_element(int n,glm::vec3* dev_idata, glm::vec3* mean) {
 	int index = threadIdx.x + (blockIdx.x * blockDim.x);
 
-	if (index > N - 1) {
+	if (index > n - 1) {
 		return;
 	}
 
@@ -131,21 +136,21 @@ __global__ void Subtract_element(int n,glm::vec3* dev_idata, glm::vec3* mean) {
 __global__ void multiply_transpose(int n, glm::vec3* dev_first, glm::vec3* dev_second, glm::mat3 *out) {
 	int index = threadIdx.x + (blockIdx.x * blockDim.x);
 
-	if (index > N - 1) {
+	if (index > n - 1) {
 		return;
 	}
 
 	out[index] = glm::outerProduct(dev_first[index], dev_second[index]);
 }
 
-__global__ void update(int N_first, glm::vec3 *, glm::mat3 R, glm::vec3 trans) {
+__global__ void update(int N_first, glm::vec3 *dev_first, glm::mat3 dev_rot, glm::vec3 dev_trans, glm::vec3* dev_first_buf) {
 	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
 	if (index >= N_first)
 		return;
 
-	dev_pos[index] = R * dev_pos[index] + trans;
+	dev_first_buf[index] = dev_rot * dev_first[index] + dev_trans;
 }
-
+/*
 // Multiply the arrays A and B on GPU and save the result in C
 // C(m,n) = A(m,k) * B(k,n)
 void gpu_blas_mmul(cublasHandle_t &handle, const float *A, const float *B, float *C, const int m, const int k, const int n) {
@@ -158,7 +163,8 @@ void gpu_blas_mmul(cublasHandle_t &handle, const float *A, const float *B, float
 	// Do the actual multiplication
 	cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, alpha, A, lda, B, ldb, beta, C, ldc);
 }
-
+*/
+/*
 __global__ void matrix_subtraction(float* A, float* B, float* C, int m, int n) {
 	const int index = blockIdx.x * blockDim.x + threadIdx.x;
 	if (index >= m*n) {
@@ -181,6 +187,7 @@ __global__ void setValueOnDevice(float* device_var, int val) {
 	*device_var = val;
 }
 
+
 __global__ void find_svd(glm::mat3 &w, glm::mat3 &u, glm::mat3 &s, glm::mat3 &v) {
 
 	svd(w[0][0], w[0][1], w[0][2], w[1][0], w[1][1], w[1][2], w[2][0], w[2][1], w[2][2],
@@ -188,7 +195,7 @@ __global__ void find_svd(glm::mat3 &w, glm::mat3 &u, glm::mat3 &s, glm::mat3 &v)
 		s[0][0], s[0][1], s[0][2], s[1][0], s[1][1], s[1][2], s[2][0], s[2][1], s[2][2],
 		v[0][0], v[0][1], v[0][2], v[1][0], v[1][1], v[1][2], v[2][0], v[2][1], v[2][2]);
 }
-
+*/
 void scanmatch::GPU::run(int N_first, int N_second) {
 
 	dim3 numBlocks_first((N_first + blockSize - 1) / blockSize);
@@ -259,314 +266,15 @@ void scanmatch::GPU::run(int N_first, int N_second) {
 	cudaMemcpy(host_mean_first, dev_mean_first, sizeof(glm::vec3), cudaMemcpyDeviceToHost);
 	cudaMemcpy(host_mean_corr, dev_mean_corr, sizeof(glm::vec3), cudaMemcpyDeviceToHost);
 
-	glm::mat3 R = host_U * host_Vt;
-	glm::vec3 t = host_mean_corr[0] - R * host_mean_first[0];
+	glm::mat3 host_rot = host_U * host_Vt;
+	glm::vec3 host_trans = host_mean_corr[0] - host_rot * host_mean_first[0];
 
-}
+	cudaMemcpy(dev_rot, &host_rot, sizeof(glm::mat3) , cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_trans, &host_trans, sizeof(glm::mat3), cudaMemcpyHostToDevice);
 
 
+	update << <numBlocks_first, blockSize >> > (N_first, dev_first, dev_rot, dev_trans, dev_first_buf);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-void getArraySum(int n, float* input, float* sum) {
-	float* padded_idata;
-	int padded_size = 1 << (ilog2ceil(n));
-
-	cudaMalloc((void**)&padded_idata, padded_size * sizeof(float));
-	checkCUDAErrorWithLine("cudaMalloc padded_idata failed!");
-
-	cudaMemset(padded_idata, 0, padded_size * sizeof(float));
-	cudaMemcpy(padded_idata, input, sizeof(float) * n, cudaMemcpyDeviceToDevice);
-
-	int iterations = ilog2(padded_size);
-
-	int number_of_threads = padded_size;
-	for (int d = 0; d < iterations; d++) {
-		number_of_threads /= 2;
-		dim3 fullBlocksPerGridUpSweep((number_of_threads + blockSize - 1) / blockSize);
-		upSweepOptimized << <fullBlocksPerGridUpSweep, blockSize >> >(padded_size, d, padded_idata);
-	}
-
-	cudaMemcpy(sum, padded_idata + padded_size - 1, sizeof(float), cudaMemcpyDeviceToDevice);
-
-	cudaFree(padded_idata);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-void printMatrix(float* A, int m, int n) {
-	for (int i = 0; i < m; i++) {
-		for (int j = 0; j < n; j++) {
-			std::cout << A[i*n + j] << " ";
-		}
-		std::cout << std::endl;
-	}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-namespace NaiveGPU {
-	float* dev_x;
-	float* dev_y;
-
-	float* dev_x_corr;
-	float* dev_R;
-	float* dev_translation;
-
-
-	void initScan(int numX) {
-
-
-		cudaMalloc((void**)&dev_x_corr, numX * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_x_corr failed!");
-
-		cudaMalloc((void**)&dev_R, 3 * 3 * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_R failed!");
-
-		cudaMalloc((void**)&dev_translation, 3 * 1 * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_translation failed!");
-	}
-
-	void match(float* x, float* y, int numX, int numY) {
-
-		int eachX = numX / 3;
-		int eachY = numY / 3;
-
-		dim3 numBlocks((eachX + blockSize - 1) / blockSize);
-		dim3 numBlocks1((numX+blockSize - 1) / blockSize);
-		dim3 numBlocks2((3 * 3 + blockSize - 1) / blockSize);
-		dim3 numBlocks3((3 * 1 + blockSize - 1) / blockSize);
-
-		//Copy data to GPU
-		cudaMalloc((void**)&dev_x, numX * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_x failed!");
-		cudaMemcpy(dev_x, x, sizeof(float) * numX, cudaMemcpyHostToDevice);
-
-		cudaMalloc((void**)&dev_y, numY * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_y failed!");
-		cudaMemcpy(dev_y, y, sizeof(float) * numY, cudaMemcpyHostToDevice);
-
-		//Find Correspondence
-		findCorrespondence << <numBlocks, blockSize >> >(dev_x, numX, dev_y, numY, dev_x_corr);
-
-		//Transpose x_corr and x
-		float* dev_x_tr;
-		cudaMalloc((void**)&dev_x_tr, numX * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_x failed!");
-		transpose << <numBlocks1, blockSize >> >(dev_x, dev_x_tr, eachX, 3);
-
-		float* dev_x_corr_tr;
-		cudaMalloc((void**)&dev_x_corr_tr, numX * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_x failed!");
-		transpose << <numBlocks1, blockSize >> >(dev_x_corr, dev_x_corr_tr, eachX, 3);
-
-		//Mean-center x
-		float* meanX;
-		cudaMalloc((void**)&meanX, sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc sum failed!");
-		getArraySum(eachX, dev_x_tr, meanX);
-
-		float* meanY;
-		cudaMalloc((void**)&meanY, sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc sum failed!");
-		getArraySum(eachX, dev_x_tr + eachX, meanY);
-
-		float* meanZ;
-		cudaMalloc((void**)&meanZ, sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc sum failed!");
-		getArraySum(eachX, dev_x_tr + (eachX * 2), meanZ);
-
-		cudaFree(dev_x_tr);
-
-		//Mean-center x_corr
-		float* meanXC;
-		cudaMalloc((void**)&meanXC, sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc sum failed!");
-		getArraySum(eachX, dev_x_corr_tr, meanXC);
-
-		float* meanYC;
-		cudaMalloc((void**)&meanYC, sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc sum failed!");
-		getArraySum(eachX, dev_x_corr_tr + eachX, meanYC);
-
-		float* meanZC;
-		cudaMalloc((void**)&meanZC, sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc sum failed!");
-		getArraySum(eachX, dev_x_corr_tr + (eachX * 2), meanZC);
-		
-		cudaFree(dev_x_corr_tr);
-
-		meanCenter <<<numBlocks, blockSize >>>(dev_x, eachX, *meanX, *meanY, *meanZ);
-		meanCenter <<<numBlocks, blockSize >>>(dev_x_corr, eachX, *meanXC, *meanYC, *meanZC);
-
-		//Multiply x_corr_tr and x to get input to SVD
-		cudaMalloc((void**)&dev_x_corr_tr, numX * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_x failed!");
-		transpose << <numBlocks1, blockSize >> > (dev_x_corr, dev_x_corr_tr, eachX, 3);
-
-		float* dev_to_svd;
-		cudaMalloc((void**)&dev_to_svd, 3 * 3 * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_to_svd failed!");
-
-		// Create a handle for CUBLAS
-		cublasHandle_t handle;
-		cublasCreate(&handle);
-		gpu_blas_mmul(handle, dev_x_corr_tr, dev_x, dev_to_svd, 3, eachX, 3);
-
-		//Find SVD - U, V, S
-		float* dev_svd_u;
-		cudaMalloc((void**)&dev_svd_u, 3 * 3 * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_to_svd failed!");
-
-		float* dev_svd_s;
-		cudaMalloc((void**)&dev_svd_s, 3 * 3 * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_to_svd failed!");
-
-		float* dev_svd_v;
-		cudaMalloc((void**)&dev_svd_v, 3 * 3 * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_to_svd failed!");
-
-		get_svd << <1, 1 >> > (dev_to_svd, dev_svd_u, dev_svd_s, dev_svd_v);
-
-		cudaFree(dev_svd_s);
-		//Compute U x V_tr to get R
-		float* dev_svd_v_tr;
-		cudaMalloc((void**)&dev_svd_v_tr, 3 * 3 * sizeof(float));
-		checkCUDAErrorWithLine("cudaMalloc dev_to_svd failed!");
-		transpose << <numBlocks2, blockSize >> > (dev_svd_v, dev_svd_v_tr, 3, 3);
-
-		cudaFree(dev_svd_v);
-
-		gpu_blas_mmul(handle, dev_svd_u, dev_svd_v_tr, dev_R, 3, 3, 3);
-
-		//Compute translation = x_corr_mean - R.x_mean
-		float* dev_x_mean;
-		cudaMalloc((void**)&dev_x_mean, 3 * sizeof(float));
-		dev_x_mean[0] = *meanX;
-		dev_x_mean[1] = *meanY;
-		dev_x_mean[2] = *meanZ;
-
-		float* dev_y_mean;
-		cudaMalloc((void**)&dev_y_mean, 3 * sizeof(float));
-		dev_y_mean[0] = *meanXC;
-		dev_y_mean[1] = *meanYC;
-		dev_y_mean[2] = *meanZC;
-
-		float* inter;
-		cudaMalloc((void**)&inter, 3 * 1 * sizeof(float));
-		gpu_blas_mmul(handle, dev_R, dev_x_mean, inter, 3, 3, 1);
-
-		matrix_subtraction << <numBlocks3, blockSize >> > (dev_y_mean, inter, dev_translation, 1, 3);
-
-		//Apply rotation on x
-		float* dev_newX;
-		cudaMalloc((void**)&dev_newX, numX * sizeof(float));
-		gpu_blas_mmul(handle, dev_x, dev_R, dev_newX, eachX, 3, 3);
-
-		//Apply translation on x
-		addTranslation << <numBlocks, blockSize >> > (dev_newX, dev_translation, eachX);
-
-		cudaMemcpy(x, dev_newX, sizeof(float) * numX, cudaMemcpyDeviceToHost);
-	}
+	cudaMemcpy(dev_first, dev_first_buf, N_first * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
 }
 

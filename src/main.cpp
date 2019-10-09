@@ -17,8 +17,8 @@
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
-#define CPU 0
-#define GPU 1
+#define CPU_on 0
+#define GPU_on 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 const float DT = 0.2f;
@@ -30,7 +30,6 @@ int N_second;
 glm::vec3 *first_points;
 glm::vec3 *second_points;
 
-const float DT = 0.2f;
 
 void readPlyfile(std::string plyfile, int* num_points, glm::vec3* points) {
   std::ifstream myfile(plyfile);
@@ -81,15 +80,9 @@ int main(int argc, char* argv[]) {
   readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun000.ply", &N_second, second_points);
   
   if (init(N_first, N_second, first_points, second_points)) {
-    mainLoop(N_first, N_second, first_points, second_points);
-
-#if CPU
-  scanmatch::endSimulation();
-#elif GPU
-  scanmatch::endSimulation();
-#endif
-
-    return 0;
+	  mainLoop(N_first, N_second, first_points, second_points);
+	  scanmatch::endSimulation();
+	  return 0;
   }
   else {
     return 1;
@@ -167,11 +160,7 @@ bool init(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_
   cudaGLRegisterBufferObject(boidVBO_velocities);
 
   // Initialize simulation
-#if CPU
-  scanmatching::CPU::initSimulation(N_first, N_second, first_points, second_points);
-#elif GPU
-  scanmatching::GPU::initSimulation(N1);
-#endif
+  scanmatch::initSimulation(N_first, N_second, *first_points, *second_points);
 
   updateCamera();
 
@@ -179,10 +168,10 @@ bool init(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_
 
   glEnable(GL_DEPTH_TEST);
 
-#if CPU
-  scanmatching::CPU::init(N1, N2, point);
-#elif GPU
-  scanmatching::GPU::init(N1);
+#if CPU_on
+  scanmatch::CPU::initSimulation(N_first, N_second, first_points, second_points);
+#elif GPU_on
+  scanmatch::GPU::initSimulation(N_first, N_second, first_points, second_points);
 #endif
 
 
@@ -268,14 +257,14 @@ void runCUDA(int N_first, int N_second, glm::vec3* first_points, glm::vec3* seco
 
 
 // DO THIS
-#if CPU
+#if CPU_on
   ScanMatching::CPU::icp(xpoints, ypoints, N_first, N_second);
   ScanMatching::copyToDevice(N1, N2, xpoints, ypoints);
-#elif GPU
-  ScanMatching::GPU::icp(ScanMatching::getDevPos(), ScanMatching::getDevPos() + 3 * N1, N1, N2);
+#elif GPU_on
+  scanmatch::GPU::run(N_first, N_second);
 #endif
 #if VISUALIZE
-  ScanMatching::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
+  scanmatch::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
 #endif
   // unmap buffer object
   cudaGLUnmapBufferObject(boidVBO_positions);

@@ -6,6 +6,7 @@
 #include "utilityCore.hpp"
 #include "kernel.h"
 #include "device_launch_parameters.h"
+#include <glm/gtc/type_ptr.hpp>
 
 // LOOK-2.1 potentially useful for doing grid-based neighbor search
 #ifndef imax
@@ -120,15 +121,19 @@ __global__ void kernAddColor2(float* dev_color, int N1, int N2) {
 	}
 }
 
-void scanmatch::copyToDevice(int N1, int N2, float* xpoints, float* ypoints) {
-	cudaMemcpy(dev_pos, xpoints, sizeof(float) * 3 * N1, cudaMemcpyHostToDevice);
-	cudaMemcpy(dev_pos + (3 * N1), ypoints, sizeof(float) * 3 * N2, cudaMemcpyHostToDevice);
+void scanmatch::copyToDevice(int N_first, int N_second, glm::vec3 first_points, glm::vec3 second_points) {
+
+	float* data_first_points = glm::value_ptr(first_points);
+	float* data_second_points = glm::value_ptr(second_points);
+
+	cudaMemcpy(dev_pos, data_first_points, sizeof(float) * 3 * N_first, cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_pos + (3 * N_first), data_second_points, sizeof(float) * 3 * N_second, cudaMemcpyHostToDevice);
 }
 /**
 * Initialize memory, update some globals
 */
-void scanmatch::initSimulation(int N1, int N2, float* xpoints, float* ypoints) {
-	int N = N1 + N2;
+void scanmatch::initSimulation(int N_first, int N_second, glm::vec3 first_points, glm::vec3 second_points) {
+	int N = N_first + N_second;
 	numObjects = N;
 
 	cudaMalloc((void**)&dev_pos, 3 * N * sizeof(float));
@@ -137,12 +142,12 @@ void scanmatch::initSimulation(int N1, int N2, float* xpoints, float* ypoints) {
 	cudaMalloc((void**)&dev_color, 3 * N * sizeof(float));
 	checkCUDAErrorWithLine("cudaMalloc dev_color failed!");
 
-	scanmatch::copyToDevice(N1, N2, xpoints, ypoints);
+	scanmatch::copyToDevice(N_first, N_second, first_points, second_points);
 
-	dim3 fullBlocksPerGrid1((N1 + blockSize - 1) / blockSize);
-	kernAddColor << <fullBlocksPerGrid1, blockSize >> > (dev_color, N1);
-	dim3 fullBlocksPerGrid2((N2 + blockSize - 1) / blockSize);
-	kernAddColor2 << <fullBlocksPerGrid2, blockSize >> > (dev_color, N1, N2);
+	dim3 fullBlocksPerGrid1((N_first + blockSize - 1) / blockSize);
+	kernAddColor << <fullBlocksPerGrid1, blockSize >> > (dev_color, N_first);
+	dim3 fullBlocksPerGrid2((N_second + blockSize - 1) / blockSize);
+	kernAddColor2 << <fullBlocksPerGrid2, blockSize >> > (dev_color, N_first, N_second);
 
 	gridCellWidth = 2.0f;
 	int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;

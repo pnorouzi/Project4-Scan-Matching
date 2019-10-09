@@ -12,7 +12,7 @@
 namespace scanmatch {
 	namespace GPU {
 
-		void initSimulation(int N_first, int N_second,float *first,float *second);
+		void initSimulation(int N_first, int N_second, glm::vec3 *first, glm::vec3 *second);
 
 		void run(int N_first, int N_second);
 
