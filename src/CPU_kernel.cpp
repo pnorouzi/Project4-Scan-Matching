@@ -33,13 +33,12 @@ glm::vec3* dev_second;
 
 glm::vec3 findmatch(int N_first, int N_second, glm::vec3* first, glm::vec3* second) {
 	
-	glm::vec3 *corr;
 	
 	glm::vec3 *corr = new glm::vec3[N_first];
 	
 
 	glm::vec3 desired_point;
-	float min_distance = LONG_MAX;
+	float min_distance = 999999999.0f;
 
 	for (int i = 0; i < N_first; i++) {
 		for (int j = 0; j < N_second; j++) {
@@ -101,8 +100,6 @@ glm::mat3 multiply_transpose(int n, glm::vec3* first, glm::vec3* corr) {
 
 glm::vec3 update(int N_first, glm::vec3 *host_first, glm::mat3 dev_rot, glm::vec3 dev_trans) {
 	
-	glm::vec3 *host_first_buf;
-
 	glm::vec3 *host_first_buf = new glm::vec3[N_first];
 
 	*host_first_buf = *host_first;
@@ -181,11 +178,9 @@ void scanmatch::CPU::run(int N_first, int N_second, glm::vec3* first_points, glm
 	glm::vec3 host_mean_first(0.0f, 0.0f, 0.0f);
 	glm::vec3 host_mean_corr(0.0f, 0.0f, 0.0f);
 	//glm::vec3 *mean = new glm::vec3[1];
-	glm::vec3 *host_centered_first;
 	glm::vec3 *host_centered_first = new glm::vec3[N_first];
 	//*host_centered_first = *first_points;
 
-	glm::vec3 *host_centered_corr;
 	glm::vec3 *host_centered_corr = new glm::vec3[N_first];
 	//*host_centered_corr = host_corr;
 	

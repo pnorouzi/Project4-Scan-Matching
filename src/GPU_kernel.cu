@@ -142,7 +142,7 @@ __global__ void Subtract_element(int n,glm::vec3* dev_idata, glm::vec3* mean) {
 		return;
 	}
 
-	dev_idata[index] -= mean;
+	dev_idata[index] -= *mean;
 }
 
 __global__ void multiply_transpose(int n, glm::vec3* dev_first, glm::vec3* dev_second, glm::mat3 *out) {
