@@ -3,10 +3,11 @@
 #include <cuda.h>
 #include <cmath>
 #include <glm/glm.hpp>
-#include "utilityCore.hpp"
+//#include "utilityCore.hpp"
 #include "kernel.h"
 #include "device_launch_parameters.h"
 #include <glm/gtc/type_ptr.hpp>
+#include "GPU_kernel.h"
 
 // LOOK-2.1 potentially useful for doing grid-based neighbor search
 #ifndef imax
@@ -65,6 +66,14 @@ float gridCellWidth;
 float gridInverseCellWidth;
 glm::vec3 gridMinimum;
 
+/*
+glm::vec3* dev_first;
+glm::vec3* dev_first_buf;
+glm::vec3* dev_second;
+glm::vec3* dev_corr;
+glm::mat3* dev_rot;
+glm::vec3* dev_trans;
+*/
 /******************
 * initSimulation *
 ******************/
@@ -87,6 +96,7 @@ __host__ __device__ glm::vec3 generateRandomVec3(float time, int index) {
 	thrust::default_random_engine rng(hash((int)(index * time)));
 	thrust::uniform_real_distribution<float> unitDistrib(-1, 1);
 	return glm::vec3((float)unitDistrib(rng), (float)unitDistrib(rng), (float)unitDistrib(rng));
+
 }
 
 /**
@@ -121,18 +131,39 @@ __global__ void kernAddColor2(float* dev_color, int N1, int N2) {
 	}
 }
 
-void scanmatch::copyToDevice(int N_first, int N_second, glm::vec3 first_points, glm::vec3 second_points) {
+void scanmatch::copyToDevice(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
+	
+	std::vector<glm::vec3> vec_first;
 
-	float* data_first_points = glm::value_ptr(first_points);
-	float* data_second_points = glm::value_ptr(second_points);
+	for (int i = 0; i < N_first;i++) {
+		vec_first.push_back(first_points[i]);
+	}
 
-	cudaMemcpy(dev_pos, data_first_points, sizeof(float) * 3 * N_first, cudaMemcpyHostToDevice);
-	cudaMemcpy(dev_pos + (3 * N_first), data_second_points, sizeof(float) * 3 * N_second, cudaMemcpyHostToDevice);
+	float *flat_array_first = &vec_first[0].x;
+
+	for (int i = 0; i < (3*N_first); i++)
+		std::cout << flat_array_first[i] << std::endl;
+
+	std::vector<glm::vec3> vec_second;
+
+	for (int i = 0; i < N_first; i++) {
+		vec_second.push_back(second_points[i]);
+	}
+
+	float *flat_array_second = &vec_second[0].x;
+
+	for (int i = 0; i < (3 * N_first); i++)
+		std::cout << flat_array_second[i] << std::endl;
+
+
+
+	cudaMemcpy(dev_pos, flat_array_first, sizeof(float) * 3 * N_first, cudaMemcpyHostToDevice);
+	cudaMemcpy(dev_pos + (3 * N_first), flat_array_second, sizeof(float) * 3 * N_second, cudaMemcpyHostToDevice);
 }
 /**
 * Initialize memory, update some globals
 */
-void scanmatch::initSimulation(int N_first, int N_second, glm::vec3 first_points, glm::vec3 second_points) {
+void scanmatch::initSimulation(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
 	int N = N_first + N_second;
 	numObjects = N;
 

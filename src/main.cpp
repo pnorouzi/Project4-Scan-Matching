@@ -10,6 +10,14 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include "kernel.h"
+#include "GPU_kernel.h"
+#include "CPU_kernel.h"
+#include <fstream>
+#include <iostream>
+#include <string.h>
+#include <sstream>
+#include <iomanip>
 
 // ================
 // Configuration
@@ -60,11 +68,9 @@ void readPlyfile(std::string plyfile, int* num_points, glm::vec3* points) {
     int i = 0;
     while (i < *num_points) {
       getline(myfile, myString);
-	  std::vector<std::string> tokens = utilityCore::tokenizeString(myString);
-
-	  points[i].x = atof(tokens[0].c_str());
-	  points[i].y = atof(tokens[1].c_str());
-	  points[i].z = atof(tokens[2].c_str());
+	  std::istringstream ss(myString);
+	  //std::vector<std::string> tokens = utilityCore::tokenizeString(myString);
+	  ss >> points[i].x >> points[i].y >> points[i].z;
 
       i++;
     }
@@ -160,19 +166,13 @@ bool init(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_
   cudaGLRegisterBufferObject(boidVBO_velocities);
 
   // Initialize simulation
-  scanmatch::initSimulation(N_first, N_second, *first_points, *second_points);
+  scanmatch::initSimulation(N_first, N_second, first_points, second_points);
 
   updateCamera();
 
   initShaders(program);
 
   glEnable(GL_DEPTH_TEST);
-
-#if CPU_on
-  scanmatch::CPU::initSimulation(N_first, N_second, first_points, second_points);
-#elif GPU_on
-  scanmatch::GPU::initSimulation(N_first, N_second, first_points, second_points);
-#endif
 
 
   return true;
@@ -259,7 +259,7 @@ void runCUDA(int N_first, int N_second, glm::vec3* first_points, glm::vec3* seco
 // DO THIS
 #if CPU_on
   scanmatch::CPU::run(N_first, N_second, first_points, second_points);
-  scanmatch::copyToDevice(N_first, N_second, *first_points, *second_points);
+  scanmatch::copyToDevice(N_first, N_second, first_points, second_points);
 #elif GPU_on
   scanmatch::GPU::run(N_first, N_second);
 #endif

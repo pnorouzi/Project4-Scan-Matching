@@ -37,6 +37,7 @@ glm::mat3* dev_rot;
 glm::vec3* dev_trans;
 
 
+
 void scanmatch::GPU::initSimulation(int N_first, int N_second, glm::vec3 *first, glm::vec3 *second) {
 
 	cudaMalloc((void**)&dev_first, N_first * sizeof(glm::vec3));

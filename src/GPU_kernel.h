@@ -9,6 +9,7 @@
 #include <cmath>
 #include <vector>
 
+
 namespace scanmatch {
 	namespace GPU {
 
