@@ -23,8 +23,8 @@
 
 // LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
-#define CPU_on 1
-#define GPU_on 0
+#define CPU_on 0
+#define GPU_on 1
 
 // LOOK-1.2 - change this to adjust particle count in the simulation
 const float DT = 0.2f;
