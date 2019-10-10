@@ -1,29 +1,19 @@
 #define GLM_FORCE_CUDA
 #include <cuda.h>
 #include <cuda_runtime_api.h>
-#include <iostream>
-#include <cublas_v2.h>
 #include <fstream>
-#include <glm/glm.hpp>
 #include "svd3.h"
-#include "kernel.h"
-#include "device_launch_parameters.h"
 #include "GPU_kernel.h"
+#include "device_launch_parameters.h"
+#include <iostream>
+#include <stdio.h>
+#include <glm/glm.hpp>
+#include "utilities.h"
+//#include "kernel.h"
+#include <thrust/reduce.h>
+#include <glm/vec3.hpp>
 
 
-#define checkCUDAErrorWithLine(msg) checkCUDAError(msg, __LINE__)
-
-
-void checkCUDAError(const char *msg, int line = -1) {
-	cudaError_t err = cudaGetLastError();
-	if (cudaSuccess != err) {
-		if (line >= 0) {
-			fprintf(stderr, "Line %d: ", line);
-		}
-		fprintf(stderr, "Cuda error: %s: %s.\n", msg, cudaGetErrorString(err));
-		exit(EXIT_FAILURE);
-	}
-}
 
 #define blockSize 128
 
@@ -41,128 +31,25 @@ glm::vec3* dev_trans;
 void scanmatch::GPU::initSimulation(int N_first, int N_second, glm::vec3 *first, glm::vec3 *second) {
 
 	cudaMalloc((void**)&dev_first, N_first * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMalloc dev_first failed!");
 	cudaMemcpy(dev_first, first, sizeof(glm::vec3) * N_first, cudaMemcpyHostToDevice);
 
 	cudaMalloc((void**)&dev_first, N_first * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMalloc dev_second failed!");
 	cudaMemcpy(dev_first_buf, first, sizeof(glm::vec3) * N_first, cudaMemcpyHostToDevice);
 
 	cudaMalloc((void**)&dev_second, N_second * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMalloc dev_second failed!");
 	cudaMemcpy(dev_second, second, sizeof(glm::vec3) * N_second, cudaMemcpyHostToDevice);
 
 	cudaMalloc((void**)&dev_corr, N_first * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMalloc dev_corr failed!");
 
 	cudaMalloc((void**)&dev_rot, sizeof(glm::mat3));
-	checkCUDAErrorWithLine("cudaMalloc dev_rot failed!");
 
 	cudaMalloc((void**)&dev_trans, sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMalloc dev_trans failed!");
 
 }
 
 
 
-__global__ void findmatch(int N_first, int N_second, glm::vec3* dev_first, glm::vec3* dev_second, glm::vec3* dev_corr) {
-	const int index = blockIdx.x * blockDim.x + threadIdx.x;
-	if (index >= N_first) {
-		return;
-	}
-	
-	glm::vec3 desired_point;
-	float min_distance = LONG_MAX;
-	for (int ind = 0; ind < N_second; ind++) {
-		float distance = glm::distance(dev_first[index], dev_second[ind]);
-		if (distance < min_distance) {
-			desired_point = dev_second[ind];
-			min_distance = distance;
-		}
 
-	}
-	
-	dev_corr[index] = desired_point;
-}
-
-__global__ void up_sweep(int N, glm::vec3 *Dev_odata, int d) {
-
-	int index = threadIdx.x + (blockIdx.x * blockDim.x);
-
-	index = index * (1 << (d + 1));
-
-	if (index > N - 1) {
-		return;
-	}
-
-	if (((index + (1 << (d)) - 1) < N) && ((index + (1 << (d + 1)) - 1) < N)) {
-
-		Dev_odata[index + (1 << (d + 1)) - 1].x += Dev_odata[index + (1 << (d)) - 1].x;
-		Dev_odata[index + (1 << (d + 1)) - 1].y += Dev_odata[index + (1 << (d)) - 1].y;
-		Dev_odata[index + (1 << (d + 1)) - 1].z += Dev_odata[index + (1 << (d)) - 1].z;
-	}
-
-}
-
-inline int ilog2(int x) {
-	int lg = 0;
-	while (x >>= 1) {
-		++lg;
-	}
-	return lg;
-}
-
-inline int ilog2ceil(int x) {
-	return x == 1 ? 0 : ilog2(x - 1) + 1;
-}
-
-void find_mean_vec(int n, glm::vec3 *dev_idata, glm::vec3 *dev_mean) {
-
-	//printArray(n, idata);
-	//int new_n = n;
-	n = 1 << ilog2ceil(n); // make n something that is power of 2
-	
-	glm::vec3 *dev_odata;
-	cudaMalloc((void**)&dev_odata, n * sizeof(glm::vec3));
-
-	cudaMemcpy(dev_odata, dev_idata, n * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
-
-	for (int d = 0; d <= ((ilog2ceil(n)) - 1); d++) {
-		int count_thread = 1 << ((ilog2ceil(n) - d - 1));   // i need ceil(n/d) threads total
-		dim3 fullBlocksPerGrid(((count_thread)+blockSize - 1) / blockSize);
-		up_sweep << <fullBlocksPerGrid, blockSize >> > (n, dev_odata, d);
-	}
-	dev_odata[n - 1] /= n;
-	dev_mean = &dev_odata[n - 1];
-}
-
-__global__ void Subtract_element(int n,glm::vec3* dev_idata, glm::vec3* mean) {
-	int index = threadIdx.x + (blockIdx.x * blockDim.x);
-
-	if (index > n - 1) {
-		return;
-	}
-
-	dev_idata[index] -= *mean;
-}
-
-__global__ void multiply_transpose(int n, glm::vec3* dev_first, glm::vec3* dev_second, glm::mat3 *out) {
-	int index = threadIdx.x + (blockIdx.x * blockDim.x);
-
-	if (index > n - 1) {
-		return;
-	}
-
-	out[index] = glm::outerProduct(dev_first[index], dev_second[index]);
-}
-
-__global__ void update(int N_first, glm::vec3 *dev_first, glm::mat3 dev_rot, glm::vec3 dev_trans, glm::vec3* dev_first_buf) {
-	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (index >= N_first)
-		return;
-
-	dev_first_buf[index] = dev_rot * dev_first[index] + dev_trans;
-}
 /*
 // Multiply the arrays A and B on GPU and save the result in C
 // C(m,n) = A(m,k) * B(k,n)

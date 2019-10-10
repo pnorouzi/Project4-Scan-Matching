@@ -271,7 +271,7 @@ inline void sortSingularValues(// matrix that we want to decompose
 }
 
 
-void QRGivensQuaternion(float a1, float a2, float &ch, float &sh)
+inline void QRGivensQuaternion(float a1, float a2, float &ch, float &sh)
 {
     // a1 = pivot point on diagonal
     // a2 = lower triangular entry we want to annihilate
@@ -352,7 +352,7 @@ inline void QRDecomposition(// matrix that we want to decompose
     q33=(-1+2*sh22)*(-1+2*sh32);
 }
 
-void svd(// input A
+inline void svd(// input A
 		float a11, float a12, float a13,
 		float a21, float a22, float a23,
 		float a31, float a32, float a33,
@@ -403,7 +403,7 @@ void svd(// input A
 
 /// polar decomposition can be reconstructed trivially from SVD result
 // A = UP
-void pd(float a11, float a12, float a13,
+inline void pd(float a11, float a12, float a13,
         float a21, float a22, float a23,
         float a31, float a32, float a33,
         // output U

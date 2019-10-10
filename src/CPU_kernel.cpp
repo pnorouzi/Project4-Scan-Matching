@@ -1,105 +1,18 @@
-#define GLM_FORCE_CUDA
+#include "CPU_kernel.h"
+#include "device_launch_parameters.h"
+#include "glm/glm.hpp"
+#include "svd3.h"
+#include <iostream>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
-#include <iostream>
-#include <cublas_v2.h>
-#include <fstream>
-#include <glm/glm.hpp>
-#include "svd3.h"
-#include "kernel.h"
-#include "device_launch_parameters.h"
-#include "CPU_kernel.h"
 
 
-#define checkCUDAErrorWithLine(msg) checkCUDAError(msg, __LINE__)
-
-
-void checkCUDAError(const char *msg, int line = -1) {
-	cudaError_t err = cudaGetLastError();
-	if (cudaSuccess != err) {
-		if (line >= 0) {
-			fprintf(stderr, "Line %d: ", line);
-		}
-		fprintf(stderr, "Cuda error: %s: %s.\n", msg, cudaGetErrorString(err));
-		exit(EXIT_FAILURE);
-	}
-}
-
-#define blockSize 128
 
 
 //glm::vec3* dev_first;
 //glm::vec3* dev_second;
 
-void findmatch(int N_first, int N_second, glm::vec3* first, glm::vec3* second, glm::vec3* corr) {
-	
-	
-	glm::vec3 desired_point;
-	float min_distance = LONG_MAX;
 
-	for (int i = 0; i < N_first; i++) {
-		for (int j = 0; j < N_second; j++) {
-			float distance = glm::distance(first[i], second[j]);
-			if (distance < min_distance) {
-				desired_point = second[j];
-				min_distance = distance;
-			}
-
-		}
-		corr[i] = desired_point;
-	}
-	
-}
-
-void find_mean_and_sub(int n, glm::vec3 *idata, glm::vec3 host_mean, glm::vec3 *host_centered) {
-	
-	cudaMemcpy(host_centered, idata, n * sizeof(glm::vec3), cudaMemcpyHostToHost);
-
-	for (int i = 0; i < n; i++) {
-		
-		host_mean += idata[i];
-	}
-	
-	host_mean /= n;
-
-
-
-	for (int i = 0; i < n; i++) {
-		host_centered[i] -= host_mean;
-	}
-	
-}
-
-void multiply_transpose(int n, glm::vec3* first, glm::vec3* corr, glm::mat3 W) {
-	
-
-	float a, b;
-
-	float sum = 0.0f;
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			sum = 0;
-			for (int k = 0; k < n; k++) {
-				a = (i == 0 ? corr[k].x : i == 1 ? corr[k].y : corr[k].z);
-				b = (j == 0 ? first[k].x : j == 1 ? first[k].y : first[k].z);
-				sum += a * b;
-			}
-			W[i][j] = sum;
-		}
-	}
-
-}
-
-void update(int N_first, glm::vec3 *host_first, glm::mat3 dev_rot, glm::vec3 dev_trans, glm::vec3* host_first_buf) {
-	
-
-	for (int i = 0; i < N_first; i++) {
-		host_first_buf[i] = (dev_rot * host_first[i]) + dev_trans;
-	}
-	
-
-
-}
 
 /*
 void scanmatch::CPU::initSimulation(int N_first, int N_second, glm::vec3* first, glm::vec3* second) {

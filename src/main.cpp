@@ -10,9 +10,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include "kernel.h"
-#include "GPU_kernel.h"
-#include "CPU_kernel.h"
+//#include "kernel.h"
 #include <fstream>
 #include <iostream>
 #include <string.h>
@@ -34,12 +32,13 @@ const float DT = 0.2f;
 
 int N_first; 
 int N_second;
+int N_FOR_VIS;
 
 glm::vec3 *first_points;
 glm::vec3 *second_points;
 
 
-void readPlyfile(std::string plyfile, int* num_points, glm::vec3* points) {
+void readPlyfile(std::string plyfile, int &num_points, glm::vec3* points) {
   std::ifstream myfile(plyfile);
   if (!myfile.is_open())
   {
@@ -59,18 +58,20 @@ void readPlyfile(std::string plyfile, int* num_points, glm::vec3* points) {
           std::string temp;
           ss >> temp;
           if (count == 2)
-            *num_points = std::stoi(temp);
+            num_points = std::stoi(temp);
         } while (count++ < 2);
       }
     } while (myString != "end_header");
 	//std::string*)std::malloc(4 * sizeof(std::string)
-	points = (glm::vec3*)malloc(*num_points * sizeof(glm::vec3));
+	points = (glm::vec3*)malloc(num_points * sizeof(glm::vec3));
     int i = 0;
-    while (i < *num_points) {
+    while (i < num_points) {
       getline(myfile, myString);
-	  std::istringstream ss(myString);
-	  //std::vector<std::string> tokens = utilityCore::tokenizeString(myString);
-	  ss >> points[i].x >> points[i].y >> points[i].z;
+	  //std::istringstream ss(myString);
+	  std::vector<std::string> tokens = utilityCore::tokenizeString(myString);
+	  points[i] = glm::vec3(atof(tokens[0].c_str()), atof(tokens[1].c_str()), atof(tokens[2].c_str()));
+	  //ss >> points[i].x >> points[i].y >> points[i].z;
+	  //printf("%f,%f,%f\n",points[i].x, points[i].y, points[i].z);
 
       i++;
     }
@@ -82,11 +83,11 @@ void readPlyfile(std::string plyfile, int* num_points, glm::vec3* points) {
 */
 int main(int argc, char* argv[]) {
   projectName = "Project 4: Scan Matching";
-  readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun045.ply", &N_first, first_points);
-  readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun000.ply", &N_second, second_points);
-  
-  if (init(N_first, N_second, first_points, second_points)) {
-	  mainLoop(N_first, N_second, first_points, second_points);
+  readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun045.ply", N_first, first_points);
+  readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun000.ply", N_second, second_points);
+  N_FOR_VIS = N_first + N_second;
+  if (init(argc, argv)) {
+	  mainLoop();
 	  scanmatch::endSimulation();
 	  return 0;
   }
@@ -104,7 +105,7 @@ GLFWwindow *window;
 /**
 * Initialization of CUDA and GLFW.
 */
-bool init(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
+bool init(int argc, char **argv) {
   cudaDeviceProp deviceProp;
   int gpuDevice = 0;
   int device_count = 0;
@@ -156,7 +157,7 @@ bool init(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_
   }
 
   // Initialize drawing state
-  initVAO(N_first + N_second);
+  initVAO();
 
   // Default to device ID 0. If you have more than one GPU and want to test a non-default one,
   // change the device ID.
@@ -174,11 +175,15 @@ bool init(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_
 
   glEnable(GL_DEPTH_TEST);
 
+//#if GPU_on
+  //scanmatch::GPU::initSimulation(N_first, N_second, first_points, second_points);
+//#endif
+
 
   return true;
 }
 
-void initVAO(int N_FOR_VIS) {
+void initVAO() {
 
   std::unique_ptr<GLfloat[]> bodies{ new GLfloat[4 * (N_FOR_VIS)] };
   std::unique_ptr<GLuint[]> bindices{ new GLuint[N_FOR_VIS] };
@@ -241,11 +246,10 @@ void initShaders(GLuint * program) {
 //====================================
 // Main loop
 //====================================
-void runCUDA(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
+void runCUDA() {
   // Map OpenGL buffer object for writing from CUDA on a single GPU
   // No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
   // use this buffer
-
   float4 *dptr = NULL;
   float *dptrVertPositions = NULL;
   float *dptrVertVelocities = NULL;
@@ -258,11 +262,11 @@ void runCUDA(int N_first, int N_second, glm::vec3* first_points, glm::vec3* seco
 
 // DO THIS
 #if CPU_on
-  scanmatch::CPU::run(N_first, N_second, first_points, second_points);
-  scanmatch::copyToDevice(N_first, N_second, first_points, second_points);
+  scanmatch::run_CPU(N_first, N_second, first_points, second_points);
 #elif GPU_on
-  scanmatch::GPU::run(N_first, N_second);
+  scanmatch::run_GPU(N_first, N_second);
 #endif
+
 #if VISUALIZE
   scanmatch::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
 #endif
@@ -271,7 +275,7 @@ void runCUDA(int N_first, int N_second, glm::vec3* first_points, glm::vec3* seco
   cudaGLUnmapBufferObject(boidVBO_velocities);
 }
 
-void mainLoop(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
+void mainLoop() {
   double fps = 0;
   double timebase = 0;
   int frame = 0;
@@ -290,8 +294,8 @@ void mainLoop(int N_first, int N_second, glm::vec3* first_points, glm::vec3* sec
       timebase = time;
       frame = 0;
     }
-
-    runCUDA(N_first, N_second,first_points, second_points);
+	
+    runCUDA();
 
     std::ostringstream ss;
     ss << "[";

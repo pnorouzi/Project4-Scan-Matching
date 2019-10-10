@@ -14,8 +14,7 @@
 #include "utilityCore.hpp"
 #include "glslUtility.hpp"
 #include "kernel.h"
-#include "GPU_kernel.h"
-#include "CPU_kernel.h"
+
 
 //====================================
 // GL Stuff
@@ -66,17 +65,17 @@ int main(int argc, char* argv[]);
 //====================================
 // Main loop
 //====================================
-void mainLoop(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points);
+void mainLoop();
 void errorCallback(int error, const char *description);
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);
 void updateCamera();
-void runCUDA(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points);
+void runCUDA();
 
 //====================================
 // Setup/init Stuff
 //====================================
-bool init(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points);
-void initVAO(int N_FOR_VIS);
+bool init(int argc, char* argv[]);
+void initVAO();
 void initShaders(GLuint *program);
