@@ -38,7 +38,10 @@ glm::vec3 *first_points;
 glm::vec3 *second_points;
 
 
-void readPlyfile(std::string plyfile, int &num_points, glm::vec3* points) {
+glm::vec3* readPlyfile(std::string plyfile, int num_points) {
+
+ glm::vec3* points = new glm::vec3[num_points];
+
   std::ifstream myfile(plyfile);
   if (!myfile.is_open())
   {
@@ -63,28 +66,31 @@ void readPlyfile(std::string plyfile, int &num_points, glm::vec3* points) {
       }
     } while (myString != "end_header");
 	//std::string*)std::malloc(4 * sizeof(std::string)
-	points = (glm::vec3*)malloc(num_points * sizeof(glm::vec3));
+	
     int i = 0;
     while (i < num_points) {
       getline(myfile, myString);
+	  std::cout << myString << " " << i << "\n";
 	  //std::istringstream ss(myString);
 	  std::vector<std::string> tokens = utilityCore::tokenizeString(myString);
 	  points[i] = glm::vec3(atof(tokens[0].c_str()), atof(tokens[1].c_str()), atof(tokens[2].c_str()));
 	  //ss >> points[i].x >> points[i].y >> points[i].z;
-	  //printf("%f,%f,%f\n",points[i].x, points[i].y, points[i].z);
+	  //printf("%f,%f,%f %d\n",points[i].x, points[i].y, points[i].z, i);
 
       i++;
     }
   }
   std::cout << "Done Reading: " << plyfile << "\n";
+  return points;
 }
 /**
 * C main function.
 */
 int main(int argc, char* argv[]) {
   projectName = "Project 4: Scan Matching";
-  readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun045.ply", N_first, first_points);
-  readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun000.ply", N_second, second_points);
+  first_points = readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun045.ply", N_first);
+  printf("%f,%f,%f\n", first_points[0].x, first_points[0].y, first_points[0].z);
+  second_points = readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun000.ply", N_second);
   N_FOR_VIS = N_first + N_second;
   if (init(argc, argv)) {
 	  mainLoop();

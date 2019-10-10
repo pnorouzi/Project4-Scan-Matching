@@ -186,7 +186,7 @@ void scanmatch::initSimulation(int N_first, int N_second, glm::vec3* first_point
 	cudaMemcpy(dev_first, first_points, N_first * sizeof(glm::vec3), cudaMemcpyHostToDevice);
 	checkCUDAErrorWithLine("cudaMemcpy failed!");
 
-	cudaMalloc((void**)&dev_first, N_first * sizeof(glm::vec3));
+	cudaMalloc((void**)&dev_first_buf, N_first * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMalloc failed!");
 	cudaMemcpy(dev_first_buf, first_points, sizeof(glm::vec3) * N_first, cudaMemcpyHostToDevice);
 	checkCUDAErrorWithLine("cudaMemcpy failed!");
