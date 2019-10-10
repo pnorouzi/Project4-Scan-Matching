@@ -66,15 +66,15 @@ set(headers
     src/glslUtility.hpp
     src/kernel.h
     src/svd3.h
-    src/utilities.h
     src/main.hpp
+    src/utilityCore.hpp
     )
 
 set(sources
     src/glslUtility.cpp
     src/kernel.cu
-    src/utilities.cpp
     src/main.cpp
+    src/utilityCore.cpp
     )
 
 list(SORT headers)

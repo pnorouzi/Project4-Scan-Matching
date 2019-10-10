@@ -33,64 +33,102 @@ const float DT = 0.2f;
 int N_first; 
 int N_second;
 int N_FOR_VIS;
+glm::vec3* first_points;
+glm::vec3* second_points;
+glm::mat4 firstTransform;
+glm::mat4 secondTransform;
 
-glm::vec3 *first_points;
-glm::vec3 *second_points;
 
 
-glm::vec3* readPlyfile(std::string plyfile, int num_points) {
 
- glm::vec3* points = new glm::vec3[num_points];
+void count_num_points(std::string filename, int *count) {
+	std::ifstream fp_in;
+	char* fname = (char*)filename.c_str();
+	fp_in.open(fname);
+	if (!fp_in.is_open()) {
+		std::cout << "Error reading from file" << strerror(errno) << std::endl;
+		throw;
+	}
+	*count = 0;
+	while (fp_in.good()) {
+		std::string line;
+		utilityCore::safeGetline(fp_in, line);
+		if (!line.empty()) {
+			*count += 1;
+			}
+		}
+	printf("%d \n", *count);
+	}
 
-  std::ifstream myfile(plyfile);
-  if (!myfile.is_open())
-  {
-    std::cout << "Error opening file: " << plyfile;
-    exit(1);
-  }
-  std::string myString;
 
-  if (!myfile.eof())
-  {
-    do {
-      getline(myfile, myString);
-      if (!myString.compare(0, 14, "element vertex")) {
-        std::istringstream ss(myString);
-        int count = 0;
-        do {
-          std::string temp;
-          ss >> temp;
-          if (count == 2)
-            num_points = std::stoi(temp);
-        } while (count++ < 2);
-      }
-    } while (myString != "end_header");
-	//std::string*)std::malloc(4 * sizeof(std::string)
-	
-    int i = 0;
-    while (i < num_points) {
-      getline(myfile, myString);
-	  std::cout << myString << " " << i << "\n";
-	  //std::istringstream ss(myString);
-	  std::vector<std::string> tokens = utilityCore::tokenizeString(myString);
-	  points[i] = glm::vec3(atof(tokens[0].c_str()), atof(tokens[1].c_str()), atof(tokens[2].c_str()));
-	  //ss >> points[i].x >> points[i].y >> points[i].z;
-	  //printf("%f,%f,%f %d\n",points[i].x, points[i].y, points[i].z, i);
+void readfile(std::string filename, int count) {
 
-      i++;
-    }
-  }
-  std::cout << "Done Reading: " << plyfile << "\n";
-  return points;
+	std::ifstream fp_in;
+	char* fname = (char*)filename.c_str();
+	fp_in.open(fname);
+	if (!fp_in.is_open()) {
+		std::cout << "Error reading from file" << strerror(errno) << std::endl;
+		throw;
+	}
+	int i = 0;
+	while (fp_in.good()) {
+		std::string line;
+		utilityCore::safeGetline(fp_in, line);
+		if (!line.empty()) {
+			replace(line.begin(), line.end(), ',', ' ');
+			//printf("%d \n", i);
+			std::vector<std::string> tokens = utilityCore::tokenizeString(line);
+			glm::vec3 point = glm::vec3 (atof(tokens[0].c_str()), atof(tokens[1].c_str()), atof(tokens[2].c_str()));
+			//printf("%f,%f,%f\n", points[i].x, points[i].y, points[i].z);
+			first_points[i] = glm::vec3(firstTransform * glm::vec4(point, 1));
+			second_points[i] = glm::vec3(secondTransform * glm::vec4(point, 1));
+			i++;
+
+			
+		}
+	}
+	//printf("%d \n", i);
 }
+
 /**
 * C main function.
 */
 int main(int argc, char* argv[]) {
   projectName = "Project 4: Scan Matching";
-  first_points = readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun045.ply", N_first);
+
+ 
+  glm::vec3 t2(0.0f, 0.0f, +0.3f);
+  glm::vec3 r2(0.5f, 0.0f, 0.0f);
+  glm::vec3 s2(2, 2, 2);
+
+  firstTransform = utilityCore::buildTransformationMatrix(t2, r2, s2);
+
+  glm::vec3 t(0.0f, 0.0f, +0.3f);
+  glm::vec3 r(-1.0f, -0.5f, 0.3f);
+  glm::vec3 s(2, 2, 2);
+
+  secondTransform = utilityCore::buildTransformationMatrix(t, r, s);
+
+
+  std::string file1 = "S:\\CIS 565\\Project4-Scan-Matching\\data\\bunny045.txt";
+  std::string file2 = "S:\\CIS 565\\Project4-Scan-Matching\\data\\bunny045.txt";
+
+  count_num_points(file1, &N_first);
+  count_num_points(file2, &N_second);
+  printf("%d \n", N_first);
+
+  first_points = (glm::vec3*)malloc(N_first * sizeof(glm::vec3));
+  second_points = (glm::vec3*)malloc(N_second * sizeof(glm::vec3));
+
+  readfile(file1, N_first);
+
+  
+  printf("%d \n", N_second);
+
+  //readfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bunny000.txt", N_second);
+
   printf("%f,%f,%f\n", first_points[0].x, first_points[0].y, first_points[0].z);
-  second_points = readPlyfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bun000.ply", N_second);
+
   N_FOR_VIS = N_first + N_second;
   if (init(argc, argv)) {
 	  mainLoop();
@@ -268,6 +306,7 @@ void runCUDA() {
 
 // DO THIS
 #if CPU_on
+  //printf("here");
   scanmatch::run_CPU(N_first, N_second, first_points, second_points);
 #elif GPU_on
   scanmatch::run_GPU(N_first, N_second);

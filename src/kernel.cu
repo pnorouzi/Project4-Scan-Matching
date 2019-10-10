@@ -72,11 +72,10 @@ dim3 threadsPerBlock(blockSize);
 // These are called ping-pong buffers.
 glm::vec3 *dev_pos;
 glm::vec3 *dev_color;
-int gridCellCount;
-int gridSideCount;
-float gridCellWidth;
-float gridInverseCellWidth;
-glm::vec3 gridMinimum;
+//int gridCellCount;
+//float gridCellWidth;
+//float gridInverseCellWidth;
+//glm::vec3 gridMinimum;
 
 glm::vec3* dev_first;
 glm::vec3* dev_first_buf;
@@ -123,7 +122,6 @@ __host__ __device__ glm::vec3 generateRandomVec3(float time, int index) {
 * CUDA kernel for generating boids with a specified mass randomly around the star.
 */
 __global__ void kernAddColor(int N, glm::vec3* dev_color, glm::vec3 val) {
-	int i = (blockIdx.x * blockDim.x) + threadIdx.x;
 
 	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
 	if (index < N) {
@@ -175,6 +173,7 @@ void scanmatch::copyBoidsToVBO(float *vbodptr_positions, float *vbodptr_velociti
 void scanmatch::initSimulation(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
 	int N = N_first + N_second;
 	numObjects = N;
+
 	cudaMalloc((void**)&dev_pos, numObjects * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMalloc dev_pos failed!");
 
@@ -210,24 +209,24 @@ void scanmatch::initSimulation(int N_first, int N_second, glm::vec3* first_point
 	cudaMemcpy(dev_pos + N_first, second_points, N_second * sizeof(glm::vec3), cudaMemcpyHostToDevice);
 	checkCUDAErrorWithLine("cudaMemcpy failed!");
 
-	printf("here");
+	
 
 	dim3 fullBlocksPerGrid1((N_first + blockSize - 1) / blockSize);
-	kernAddColor << <fullBlocksPerGrid1, blockSize >> > (N_first, dev_color, glm::vec3(1, 1, 0));
+	kernAddColor << <fullBlocksPerGrid1, blockSize >> > (N_first, dev_color, glm::vec3(0, 0.8, 0.4));
 
 	dim3 fullBlocksPerGrid2((N_second + blockSize - 1) / blockSize);
-	kernAddColor << <fullBlocksPerGrid2, blockSize >> > (N_second, dev_color+N_first, glm::vec3(0, 0, 1));
+	kernAddColor << <fullBlocksPerGrid2, blockSize >> > (N_second, dev_color+N_first, glm::vec3(1, 0.08, 0.6));
+	
+	//gridCellWidth = 2.0f;
+	//int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
+	//gridSideCount = 2 * halfSideCount;
 
-	gridCellWidth = 2.0f;
-	int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
-	gridSideCount = 2 * halfSideCount;
-
-	gridCellCount = gridSideCount * gridSideCount * gridSideCount;
-	gridInverseCellWidth = 1.0f / gridCellWidth;
-	float halfGridWidth = gridCellWidth * halfSideCount;
-	gridMinimum.x -= halfGridWidth;
-	gridMinimum.y -= halfGridWidth;
-	gridMinimum.z -= halfGridWidth;
+	//gridCellCount = gridSideCount * gridSideCount * gridSideCount;
+	//gridInverseCellWidth = 1.0f / gridCellWidth;
+	//float halfGridWidth = gridCellWidth * halfSideCount;
+	//gridMinimum.x -= halfGridWidth;
+	//gridMinimum.y -= halfGridWidth;
+	//gridMinimum.z -= halfGridWidth;
 	cudaDeviceSynchronize();
 }
 
@@ -327,9 +326,9 @@ __global__ void update(int N_first, glm::vec3 *dev_first, glm::mat3 dev_rot, glm
 void scanmatch::run_GPU(int N_first, int N_second) {
 
 	dim3 numBlocks_first((N_first + blockSize - 1) / blockSize);
-	dim3 numBlocks_second((N_second + blockSize - 1) / blockSize);
-	dim3 numBlocks_rot((3 * 3 + blockSize - 1) / blockSize);
-	dim3 numBlocks3_tran((3 * 1 + blockSize - 1) / blockSize);
+	//dim3 numBlocks_second((N_second + blockSize - 1) / blockSize);
+	//dim3 numBlocks_rot((3 * 3 + blockSize - 1) / blockSize);
+	//dim3 numBlocks3_tran((3 * 1 + blockSize - 1) / blockSize);
 
 	findmatch << <numBlocks_first, blockSize >> > (N_first, N_second, dev_first, dev_second, dev_corr);
 
@@ -411,18 +410,13 @@ void scanmatch::run_GPU(int N_first, int N_second) {
 
 
 
-
-
-
-
-
 void findmatch_cpu(int N_first, int N_second, glm::vec3* first, glm::vec3* second, glm::vec3* corr) {
 
-
 	glm::vec3 desired_point;
-	float min_distance = LONG_MAX;
-
 	for (int i = 0; i < N_first; i++) {
+		float min_distance = glm::distance(first[i], second[0]);
+		desired_point = second[0];
+		//printf("%d \n", i);
 		for (int j = 0; j < N_second; j++) {
 			float distance = glm::distance(first[i], second[j]);
 			if (distance < min_distance) {
@@ -433,12 +427,10 @@ void findmatch_cpu(int N_first, int N_second, glm::vec3* first, glm::vec3* secon
 		}
 		corr[i] = desired_point;
 	}
-
+	//printf("out /n");
 }
 
-void find_mean_and_sub(int n, glm::vec3 *idata, glm::vec3 host_mean, glm::vec3 *host_centered) {
-
-	cudaMemcpy(host_centered, idata, n * sizeof(glm::vec3), cudaMemcpyHostToHost);
+void find_mean(int n, glm::vec3 *idata, glm::vec3 host_mean) {
 
 	for (int i = 0; i < n; i++) {
 
@@ -447,93 +439,84 @@ void find_mean_and_sub(int n, glm::vec3 *idata, glm::vec3 host_mean, glm::vec3 *
 
 	host_mean /= n;
 
-
-
-	for (int i = 0; i < n; i++) {
-		host_centered[i] -= host_mean;
-	}
-
 }
-
-void multiply_transpose_cpu(int n, glm::vec3* first, glm::vec3* corr, glm::mat3 W) {
-
-
-	float a, b;
-
-	float sum = 0.0f;
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			sum = 0;
-			for (int k = 0; k < n; k++) {
-				a = (i == 0 ? corr[k].x : i == 1 ? corr[k].y : corr[k].z);
-				b = (j == 0 ? first[k].x : j == 1 ? first[k].y : first[k].z);
-				sum += a * b;
-			}
-			W[i][j] = sum;
-		}
-	}
-
-}
-
-void update_cpu(int N_first, glm::vec3 *host_first, glm::mat3 dev_rot, glm::vec3 dev_trans, glm::vec3* host_first_buf) {
-
-
-	for (int i = 0; i < N_first; i++) {
-		host_first_buf[i] = (dev_rot * host_first[i]) + dev_trans;
-	}
-
-
-
-}
-
 
 void scanmatch::run_CPU(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
-
-	glm::vec3* host_corr = (glm::vec3*)malloc(N_first * sizeof(glm::vec3*));
-
+	//printf("here /n");
+	glm::vec3* host_corr = (glm::vec3*)malloc(N_first * sizeof(glm::vec3));
+	//printf("here /n");
 	findmatch_cpu(N_first, N_second, first_points, second_points, host_corr);
-
+	
+	
+	
 	glm::vec3 host_mean_first(0.0f, 0.0f, 0.0f);
 	glm::vec3 host_mean_corr(0.0f, 0.0f, 0.0f);
-	//glm::vec3 *mean = new glm::vec3[1];
+	
 
-	glm::vec3* host_centered_first = (glm::vec3*)malloc(N_first * sizeof(glm::vec3*));
+	for (int i = 0; i <N_first; i++) {
 
-	//*host_centered_first = *first_points;
-	glm::vec3* host_centered_corr = (glm::vec3*)malloc(N_first * sizeof(glm::vec3*));
-	//*host_centered_corr = host_corr;
+		host_mean_first += first_points[i];
+		host_mean_corr += host_corr[i];
+	}
 
-	find_mean_and_sub(N_first, first_points, host_mean_first, host_centered_first);
-	find_mean_and_sub(N_first, host_corr, host_mean_corr, host_centered_corr);
+	host_mean_first /= N_first;
+	host_mean_corr /= N_first;
+	
+	printf("%f,%f,%f\n", host_mean_corr.x, host_mean_corr.y, host_mean_corr.z);
 
-	glm::mat3 W;
+	//glm::mat3 W;
+	float W[3][3] = { 0 };
+	
+	for (int k = 0; k < N_first; k++) {
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				W[i][j] += ((host_corr[k] - host_mean_corr)[i]) * ((first_points[k] - host_mean_first)[j]);
+			}
+		}
+	}
+	
 
-	multiply_transpose_cpu(N_first, host_centered_first, host_centered_corr, W);
-
-	glm::mat3 U;
+	//multiply_transpose_cpu(N_first, host_centered_first, host_centered_corr, W);
+	printf("%f \n", W[2][1]);
+	printf("%f \n", W[2][2]);
+	//glm::mat3 U;
 	//glm::mat3 U = new glm::mat3[1];
-	glm::mat3 S;
-	glm::mat3 V;
+	//glm::mat3 S;
+	//glm::mat3 V;
 
+	float U[3][3] = { 0 };
+	float S[3][3] = { 0 };
+	float V[3][3] = { 0 };
+	//printf("%f \n", V[3][3]);
 	svd(W[0][0], W[0][1], W[0][2], W[1][0], W[1][1], W[1][2], W[2][0], W[2][1], W[2][2],
 		U[0][0], U[0][1], U[0][2], U[1][0], U[1][1], U[1][2], U[2][0], U[2][1], U[2][2],
 		S[0][0], S[0][1], S[0][2], S[1][0], S[1][1], S[1][2], S[2][0], S[2][1], S[2][2],
 		V[0][0], V[0][1], V[0][2], V[1][0], V[1][1], V[1][2], V[2][0], V[2][1], V[2][2]);
 
-	glm::mat3 host_U(glm::vec3(U[0][0], U[1][0], U[2][0]), glm::vec3(U[0][1], U[1][1], U[2][1]), glm::vec3(U[0][2], U[1][2], U[2][2]));
-	glm::mat3 host_Vt(glm::vec3(V[0][0], V[0][1], V[0][2]), glm::vec3(V[1][0], V[1][1], V[1][2]), glm::vec3(V[2][0], V[2][1], V[2][2]));
+	printf("%f \n", U[2][1]);
+	printf("%f \n", S[2][2]);
+	//printf("%f \n", V[3][3]);
 
-	glm::mat3 host_rot = host_U * host_Vt;
-	glm::vec3 host_trans = host_mean_corr - host_rot * host_mean_first;
+	glm::mat3 host_U =  glm::mat3(glm::vec3(U[0][0], U[1][0], U[2][0]), glm::vec3(U[0][1], U[1][1], U[2][1]), glm::vec3(U[0][2], U[1][2], U[2][2]));
+	
+	glm::mat3 host_rot = host_U * glm::mat3(glm::vec3(V[0][0], V[0][1], V[0][2]), glm::vec3(V[1][0], V[1][1], V[1][2]), glm::vec3(V[2][0], V[2][1], V[2][2]));
 
-	glm::vec3* new_buf = (glm::vec3*)malloc(N_first * sizeof(glm::vec3*));
 
-	cudaMemcpy(new_buf, first_points, N_first * sizeof(glm::vec3), cudaMemcpyHostToHost);
+	if (glm::determinant(host_rot) < 0) {
+		host_rot = host_U * glm::mat3(glm::vec3(V[0][0], V[0][1], -1.0f * V[0][2]), glm::vec3(V[1][0], V[1][1], -1.0f * V[1][2]), glm::vec3(V[2][0], V[2][1], -1.0f * V[2][2]));
+	}	
 
-	update_cpu(N_first, first_points, host_rot, host_trans, new_buf);
 
-	cudaMemcpy(first_points, new_buf, N_first * sizeof(glm::vec3), cudaMemcpyHostToHost);
-	cudaMemcpy(dev_pos, new_buf, N_first * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+	glm::vec3 host_trans = host_mean_corr - (host_rot * host_mean_first);
+
+
+	for (int i = 0; i < N_first; i++) {
+		first_points[i] = (host_rot * first_points[i]) + host_trans;
+	}
+
+	cudaMemcpy(dev_pos, first_points, N_first * sizeof(glm::vec3), cudaMemcpyHostToDevice);
+	checkCUDAErrorWithLine("copyDev_pos failed!");
+
 }
 
 
