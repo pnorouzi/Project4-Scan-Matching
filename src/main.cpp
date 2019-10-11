@@ -90,9 +90,9 @@ int main(int argc, char* argv[]) {
   projectName = "Project 4: Scan Matching";
 
  
-  glm::vec3 t2(0.0f, 0.0f, +0.3f);
-  glm::vec3 r2(0.5f, 0.0f, 0.0f);
-  glm::vec3 s2(2.4, 2.4, 2.4);
+  glm::vec3 t2(0.0f, 0.0f, +0.7f);
+  glm::vec3 r2(0.0f, 0.0f, 0.0f);
+  glm::vec3 s2(2.4, 2.3, 2.6);
 
   firstTransform = utilityCore::buildTransformationMatrix(t2, r2, s2);
 
@@ -119,8 +119,6 @@ int main(int argc, char* argv[]) {
 
   
   printf("%d \n", N_second);
-
-  //readfile("S:\\CIS 565\\Project4-Scan-Matching\\data\\bunny000.txt", N_second);
 
   printf("%f,%f,%f\n", first_points[0].x, first_points[0].y, first_points[0].z);
 
@@ -214,9 +212,6 @@ bool init(int argc, char **argv) {
 
   glEnable(GL_DEPTH_TEST);
 
-//#if GPU_on
-  //scanmatch::GPU::initSimulation(N_first, N_second, first_points, second_points);
-//#endif
 
 
   return true;

@@ -72,26 +72,13 @@ dim3 threadsPerBlock(blockSize);
 // These are called ping-pong buffers.
 glm::vec3 *dev_pos;
 glm::vec3 *dev_color;
-//int gridCellCount;
-//float gridCellWidth;
-//float gridInverseCellWidth;
-//glm::vec3 gridMinimum;
+
 
 glm::vec3* dev_first;
-glm::vec3* dev_first_buf;
-glm::vec3* dev_second;
-glm::vec3* dev_corr;
-glm::mat3* dev_rot;
-glm::vec3* dev_trans;
 
-/*
-glm::vec3* dev_first;
-glm::vec3* dev_first_buf;
 glm::vec3* dev_second;
 glm::vec3* dev_corr;
-glm::mat3* dev_rot;
-glm::vec3* dev_trans;
-*/
+
 /******************
 * initSimulation *
 ******************/
@@ -185,10 +172,6 @@ void scanmatch::initSimulation(int N_first, int N_second, glm::vec3* first_point
 	cudaMemcpy(dev_first, first_points, N_first * sizeof(glm::vec3), cudaMemcpyHostToDevice);
 	checkCUDAErrorWithLine("cudaMemcpy failed!");
 
-	cudaMalloc((void**)&dev_first_buf, N_first * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMalloc failed!");
-	cudaMemcpy(dev_first_buf, first_points, sizeof(glm::vec3) * N_first, cudaMemcpyHostToDevice);
-	checkCUDAErrorWithLine("cudaMemcpy failed!");
 
 	cudaMalloc((void**)&dev_second, N_second * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMalloc failed!");
@@ -198,11 +181,6 @@ void scanmatch::initSimulation(int N_first, int N_second, glm::vec3* first_point
 	cudaMalloc((void**)&dev_corr, N_first * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMalloc failed!");
 
-	cudaMalloc((void**)&dev_rot, sizeof(glm::mat3));
-	checkCUDAErrorWithLine("cudaMalloc failed!");
-
-	cudaMalloc((void**)&dev_trans, sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMalloc failed!");
 
 	cudaMemcpy(dev_pos, first_points, N_first * sizeof(glm::vec3), cudaMemcpyHostToDevice);
 	checkCUDAErrorWithLine("cudaMemcpy failed!");
@@ -216,23 +194,9 @@ void scanmatch::initSimulation(int N_first, int N_second, glm::vec3* first_point
 
 	dim3 fullBlocksPerGrid2((N_second + blockSize - 1) / blockSize);
 	AddColor << <fullBlocksPerGrid2, blockSize >> > (N_second, dev_color+N_first, glm::vec3(1, 0.08, 0.6));
-	
-	//gridCellWidth = 2.0f;
-	//int halfSideCount = (int)(scene_scale / gridCellWidth) + 1;
-	//gridSideCount = 2 * halfSideCount;
 
-	//gridCellCount = gridSideCount * gridSideCount * gridSideCount;
-	//gridInverseCellWidth = 1.0f / gridCellWidth;
-	//float halfGridWidth = gridCellWidth * halfSideCount;
-	//gridMinimum.x -= halfGridWidth;
-	//gridMinimum.y -= halfGridWidth;
-	//gridMinimum.z -= halfGridWidth;
 	cudaDeviceSynchronize();
 }
-
-
-
-
 
 
 
@@ -328,11 +292,7 @@ __global__ void update(int N_first, glm::vec3 *dev_first, glm::mat3 dev_rot, glm
 void scanmatch::run_GPU(int N_first, int N_second) {
 
 	dim3 numBlocks_first((N_first + blockSize - 1) / blockSize);
-	//dim3 numBlocks_second((N_second + blockSize - 1) / blockSize);
-	//dim3 numBlocks_rot((3 * 3 + blockSize - 1) / blockSize);
-	//dim3 numBlocks3_tran((3 * 1 + blockSize - 1) / blockSize);
 
-	//printf("here \n");
 	findmatch << <numBlocks_first, blockSize >> > (N_first, N_second, dev_first, dev_second, dev_corr);
 	//printf("here \n");
 	thrust::device_ptr<glm::vec3> thrust_dev_first(dev_first);
@@ -343,10 +303,7 @@ void scanmatch::run_GPU(int N_first, int N_second) {
 
 	cudaMalloc((void**)&dev_mean_first, sizeof(glm::vec3));
 	cudaMalloc((void**)&dev_mean_corr, sizeof(glm::vec3));
-	//printf("here \n");
-	//find_mean_vec(N_first, dev_first, dev_mean_first);
-	//find_mean_vec(N_first, dev_corr, dev_mean_corr);
-	//printf("here \n");
+
 
 	glm::vec3 mean_first = glm::vec3(thrust::reduce(thrust_dev_first, thrust_dev_first + N_first, glm::vec3(0.0f, 0.0f, 0.0f)));
 	glm::vec3 mean_corr = glm::vec3(thrust::reduce(thrust_dev_correspond, thrust_dev_correspond + N_first, glm::vec3(0.0f, 0.0f, 0.0f)));
@@ -375,9 +332,6 @@ void scanmatch::run_GPU(int N_first, int N_second) {
 		S[0][0], S[0][1], S[0][2], S[1][0], S[1][1], S[1][2], S[2][0], S[2][1], S[2][2],
 		V[0][0], V[0][1], V[0][2], V[1][0], V[1][1], V[1][2], V[2][0], V[2][1], V[2][2]);
 
-	//printf("%f \n", U[2][1]);
-	//printf("%f \n", S[2][2]);
-	//printf("%f \n", V[3][3]);
 
 	glm::mat3 host_U = glm::mat3(glm::vec3(U[0][0], U[1][0], U[2][0]), glm::vec3(U[0][1], U[1][1], U[2][1]), glm::vec3(U[0][2], U[1][2], U[2][2]));
 
@@ -525,9 +479,6 @@ void scanmatch::endSimulation() {
 	cudaFree(dev_pos);
 	cudaFree(dev_color);
 	cudaFree(dev_first);
-	cudaFree(dev_first_buf);
 	cudaFree(dev_second);
 	cudaFree(dev_corr);
-	cudaFree(dev_rot);
-	cudaFree(dev_trans);
 }
