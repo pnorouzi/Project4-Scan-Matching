@@ -16,6 +16,10 @@ Peyman Norouzi
 
 In Computer Vision, the Iterative closest point (ICP) is an algorithm employed to minimize the difference between two clouds of points. ICP can help to reconstruct 2D or 3D images/surfaces from various scans that may not at first perfectly lineup. ICP can also be used to localize robots/autonomous cars and thus plan their's paths optimally. That is one of the main reason's that I decided to implement the algorithm on CUDA.
 
+<p align="center">
+  <img src="images/buddha.gif">
+</p>
+
 ## Table of Contents:
 
 - [ICP's mathematical algorithm](#icp-s-mathematical-algorithm)
