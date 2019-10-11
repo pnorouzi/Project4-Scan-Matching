@@ -249,7 +249,7 @@ __global__ void findmatch(int N_first, int N_second, glm::vec3* dev_first, glm::
 	float min_distance = glm::distance(dev_first[index], dev_second[0]);
 	desired_point = dev_second[0];
 
-	for (int ind = 0; ind < N_second; ind++) {
+	for (int ind = 1; ind < N_second; ind++) {
 		
 		float distance = glm::distance(dev_first[index], dev_second[ind]);
 		if (distance < min_distance) {
@@ -333,7 +333,6 @@ void scanmatch::run_GPU(int N_first, int N_second) {
 	//dim3 numBlocks3_tran((3 * 1 + blockSize - 1) / blockSize);
 
 	//printf("here \n");
-
 	findmatch << <numBlocks_first, blockSize >> > (N_first, N_second, dev_first, dev_second, dev_corr);
 	//printf("here \n");
 	thrust::device_ptr<glm::vec3> thrust_dev_pos(dev_pos);
@@ -379,7 +378,6 @@ void scanmatch::run_GPU(int N_first, int N_second) {
 
 	//cudaMalloc((void**)&dev_W, sizeof(glm::mat3));
 
-	glm::mat3 W = thrust::reduce(thrust::device, dev_B_svds, dev_B_svds + N_first, glm::mat3(0));
 
 	//printf("here \n");
 
@@ -393,10 +391,13 @@ void scanmatch::run_GPU(int N_first, int N_second) {
 
 	//cudaMemcpy(dev_W, &W, sizeof(glm::mat3), cudaMemcpyHostToDevice);
 
+	glm::mat3 W = thrust::reduce(thrust::device, dev_B_svds, dev_B_svds + N_first, glm::mat3(0));
+	
 	float U[3][3] = { 0 };
 	float S[3][3] = { 0 };
 	float V[3][3] = { 0 };
 	//printf("%f \n", V[3][3]);
+	
 	svd(W[0][0], W[0][1], W[0][2], W[1][0], W[1][1], W[1][2], W[2][0], W[2][1], W[2][2],
 		U[0][0], U[0][1], U[0][2], U[1][0], U[1][1], U[1][2], U[2][0], U[2][1], U[2][2],
 		S[0][0], S[0][1], S[0][2], S[1][0], S[1][1], S[1][2], S[2][0], S[2][1], S[2][2],
@@ -409,24 +410,22 @@ void scanmatch::run_GPU(int N_first, int N_second) {
 	glm::mat3 host_U = glm::mat3(glm::vec3(U[0][0], U[1][0], U[2][0]), glm::vec3(U[0][1], U[1][1], U[2][1]), glm::vec3(U[0][2], U[1][2], U[2][2]));
 
 	glm::mat3 host_rot = host_U * glm::mat3(glm::vec3(V[0][0], V[0][1], V[0][2]), glm::vec3(V[1][0], V[1][1], V[1][2]), glm::vec3(V[2][0], V[2][1], V[2][2]));
-
+	
 
 	if (glm::determinant(host_rot) < 0) {
 		host_rot = host_U * glm::mat3(glm::vec3(V[0][0], V[0][1], -1.0f * V[0][2]), glm::vec3(V[1][0], V[1][1], -1.0f * V[1][2]), glm::vec3(V[2][0], V[2][1], -1.0f * V[2][2]));
 	}
 	printf("here \n");
-	glm::vec3 host_trans = mean_corr - (host_rot * mean_first);
-	printf("here \n");
-	cudaMemcpy(dev_trans, &host_trans, sizeof(glm::vec3), cudaMemcpyHostToDevice);
-	checkCUDAErrorWithLine("cudaMemcpy failed!");
-	cudaMemcpy(dev_rot, &host_rot, sizeof(glm::mat3), cudaMemcpyHostToDevice);
-	checkCUDAErrorWithLine("cudaMemcpy failed!");
+	glm::vec3 host_trans = mean_corr - (host_rot *mean_first);
 	printf("here \n");
 
+	
 	update << <numBlocks_first, blockSize >> > (N_first, dev_first, host_rot, host_trans, dev_pos);
+	//update << <numBlocks_first, blockSize >> > (N_first, dev_first, R, T, dev_pos);
 
 	cudaMemcpy(dev_first, dev_pos, N_first * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
 	checkCUDAErrorWithLine("cudaMemcpy failed!");
+	cudaDeviceSynchronize();
 }
 
 
