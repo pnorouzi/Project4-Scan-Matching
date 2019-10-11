@@ -103,8 +103,8 @@ int main(int argc, char* argv[]) {
   secondTransform = utilityCore::buildTransformationMatrix(t, r, s);
 
 
-  std::string file1 = "S:\\CIS 565\\Project4-Scan-Matching\\data\\dragonStandRight.txt";
-  std::string file2 = "S:\\CIS 565\\Project4-Scan-Matching\\data\\dragonStandRight.txt";
+  std::string file1 = "S:\\CIS 565\\Project4-Scan-Matching\\data\\happyStandRight.txt";
+  std::string file2 = "S:\\CIS 565\\Project4-Scan-Matching\\data\\happyStandRight.txt";
 
   count_num_points(file1, &N_first);
   count_num_points(file2, &N_second);
@@ -317,7 +317,7 @@ void mainLoop() {
   int iter = 0;
   while (!glfwWindowShouldClose(window)) {
     std::cout << "\nIter\t" << iter++ << std::endl;
-    if (iter >= 65)
+    if (iter >= 32)
       break;
     glfwPollEvents();
 

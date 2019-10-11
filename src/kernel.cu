@@ -341,7 +341,7 @@ void scanmatch::run_GPU(int N_first, int N_second) {
 	
 
 	
-	glm::vec3 host_trans = -mean_corr - (mean_first* host_rot);
+	glm::vec3 host_trans = mean_corr - (host_rot* mean_first);
 
 	
 	update << <numBlocks_first, blockSize >> > (N_first, dev_first, host_rot, host_trans);
