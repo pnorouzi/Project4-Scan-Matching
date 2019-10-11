@@ -18,13 +18,13 @@ In Computer Vision, the Iterative closest point (ICP) is an algorithm employed t
 
 ## Table of Contents:
 
-- [ICP's mathematical algorithm](#icp-s-mathematical-algorithm-)
-- [Implementations](#implementations-)
-  * [CPU Implementation](#cpu-implementation-)
+- [ICP's mathematical algorithm](#icp-s-mathematical-algorithm)
+- [Implementations](#implementations)
+  * [CPU Implementation](#cpu-implementation)
   * [GPU Implementation](#gpu-implementation)
-- [Perfomance Implementation and Analysis](#perfomance-implementation-and-analysis-)
-- [Bloopers](#bloopers-)
-- [Sources](#sources-)
+- [Perfomance Implementation and Analysis](#perfomance-implementation-and-analysis)
+- [Bloopers](#bloopers)
+- [Sources](#sources)
 
 
 ## ICP's mathematical algorithm:
