@@ -10,129 +10,115 @@ Peyman Norouzi
 
 ## Iterative Closest Point (ICP):
 
-![](img/w_MB.png)
+<p align="center">
+  <img src="images/dragon_gpu.gif">
+</p>
 
-In Computer Vision, Iterative closest point (ICP) is an algorithm employed to minimize the difference between two clouds of points. ICP can help to reconstruct 2D or 3D images/surfaces from various scans that may not at first perfectly lineup. ICP can also be used to localize robots/autonomous cars and thus plan their's paths optimally. 
+In Computer Vision, the Iterative closest point (ICP) is an algorithm employed to minimize the difference between two clouds of points. ICP can help to reconstruct 2D or 3D images/surfaces from various scans that may not at first perfectly lineup. ICP can also be used to localize robots/autonomous cars and thus plan their's paths optimally. That is one of the main reason's that I decided to implement the algorithm on CUDA.
 
 ## Table of Contents:
 
-- [CUDA Path Tracing Implementation](#cuda-path-tracing-implementation)
-  * [Core Implementation](#core-implementation)
-  * [Core Implementation + Anti-Aliasing](#core-implementation-+-anti-aliasing)
-  * [Core Implementation + Anti-Aliasing + Motion Blur](#core-implementation-+-anti-aliasing-+-motion-blur)
+- [ICP's mathematical algorithm](#icp-s-mathematical-algorithm)
+- [Implementations](#implementations)
+  * [CPU Implementation](#cpu-implementation)
+  * [GPU Implementation](#gpu-implementation)
 - [Perfomance Implementation and Analysis](#perfomance-implementation-and-analysis)
-  * [Stream Compaction](#stream-compaction)
-  * [First bounce intersections Caching](#first-bounce-intersections-caching)
-  * [Material Sort](#material-sort)
-- [Cool Renders](#cool-renders)
 - [Bloopers](#bloopers)
+- [Sources](#sources)
 
 
 ## ICP's mathematical algorithm:
 
-The basic idea of ICP is that if the correspondance between two point cloud is known(by taking the closest point to points in cloud 1 from cloud 2), the correct relative rotation/translation that can iterativvly coverge the two clouds can be calculated in closed form. The Basic algorithm can be seen in the plot below (taken from [Here](https://www.researchgate.net/figure/a-Illustration-of-registration-process-using-ICP-algorithm-b-Schematic-representation_fig1_275540074))
+The basic idea of ICP is that if the correspondence between two-point cloud is known(by taking the closest point to points in cloud 1 from cloud 2), the correct relative rotation/translation that can iteratively coverage the two clouds can be calculated in closed form. The Basic algorithm can be seen in the plot below (taken from [Here](https://www.researchgate.net/figure/a-Illustration-of-registration-process-using-ICP-algorithm-b-Schematic-representation_fig1_275540074))
+
+<p align="center">
+  <img src="images/algoMath.png">
+</p>
 
 ## Implementations:
 
-I have implemented the ICP algorithm both on the CPU and the GPU. Since the algorithm has many matrix operations, most of its calculation can be easily parallilzed thus I expect the GPU implementation can outperform the CPU implementation.
+I have implemented the ICP algorithm both on the CPU and the GPU. Since the algorithm has many matrix operations, most of its calculation can be easily parallelized thus I expect the GPU implementation can outperform the CPU implementation significantly.
 
-### CPU Implementation:
+### CPU Implementation
+
+In the CPU implementation we have the following steps:
+
+1. For each point in the source, find the corresponding closest point in the target (time complexity: **O(N^2)**)
+2. Find the mean and move both corresponding and initial points accordingly as follows (time complexity: **O(N)**)
+<p align="center">
+  <img src="images/centeq.PNG">
+</p>
+3. Use SVD to find U and V as follows:
+<p align="center">
+  <img src="images/svdeq.PNG">
+</p>
+4. Using the current information use the following theorem to find approaprite rotation and translation matrices
+<p align="center">
+  <img src="images/Rt.PNG">
+</p>
+5. Update the initial points according to the rotation and translation matrices (time complexity **O(N)**)
+6. Repeat the steps above untill convergence (time complexity: **O(num_iters)**)
+
+As you can see the process overall is going to have roughly O(N^2) time complexity which is pretty bad considering that the objects we are working with here have more than 40000 points!
+
 
 ### GPU Implementation
 
-I am implementing ray tracing on CUDA capable of rendering globally-illuminated images very quickly. The basic idea of the implementation can be seen below:
+The GPU implementation is going to follow the same logic as the CPU implementation but it will parallelize most of the steps as follows:
 
-![](img/1280px-Ray_trace_diagram.svg.png)
+1. For each point in the source(in parallel), find the corresponding closest point in the target (time complexity: **O(N)**)
+2. Find the mean and move both corresponding and initial points accordingly as follows (time complexity: **O(logN)**)
+<p align="center">
+  <img src="images/centeq.PNG">
+</p>
+3. Use SVD to find U and V as follows:
+<p align="center">
+  <img src="images/svdeq.PNG">
+</p>
+4. Using the current information use the following theorem to find approaprite rotation and translation matrices
+<p align="center">
+  <img src="images/Rt.PNG">
+</p>
+5. Update the initial points according to the rotation and translation matrices (time complexity **O(1)**)
+6. Repeat the steps above untill convergence (time complexity: **O(num_iters)**)
 
-When a ray leaves the camera (pixel), it can hit the objects in the environment and bounce, change direction or get diffused. So it is important to implement the rules that govern the behavior/interactions between rays and materials and objects in the environment. A ray hitting an object can have the following behavior and outcomes: 
+As you can see the process overall is going to have roughly O(N) time complexity which means we should be expecting a great amount of improvement as N (number of points) increases.
 
-![](img/beh_img.png)
+Let's look at their difference, shall we??
 
-The behavior rules can be found below: 
-
-![](img/Ray_Tracing_Illustration_First_Bounce.png)
-
-
-### Core Implementation:
-
-In our core implementation we will model refraction, reflection and difusion behavior of material/ray interaction. For the refraction/reflection implemnetation I will be using Snell's law with Frensel effects using [Schlick's approximation](https://en.wikipedia.org/wiki/Schlick's_approximation). In this implementation, the ray that gets fired from the camera bouces for a maximum of 8 time (Depth of 8) unless it gets diffused or hits the light source. The walls in this rednder only diffuse and the sphere in the enviroment both reflects and refracts. The result of the render is as follows:
-
-![](img/Basic_core.png)
-
-Now let's make the left and right walls into the same material as the sphere. The result looks pretty cool:
-
-![](img/Basic_m.png)
-
-let's have two objects now! let's make it red so that the whole render get a red hue! it is starting to look like a Salvador Dali painting!
-
-![](img/Basis_2.png)
-
-### Core Implementation + Anti-Aliasing:
-
-we can use Stochastic Sampled Antialiasing method and add some noise to the position of our rays when they get fired from the camera. This would help us greatly for rendering edges of the objects. The result speaks for themselves:
-
-| Without Anti-Aliasing | With Anti-Aliasing |
+| CPU | GPU |
 | ------------- | ----------- |
-| ![](img/wo_AA.png)  | ![](img/w_AA.png) |
-| ---------------->![](img/wo_AA_Z.png)<---------------- | ---------------->![](img/w_AA_Z.png)<----------------|
-
-As you can see we were able to greatly improve our rendering performance!
-
-### Core Implementation + Anti-Aliasing + Motion Blur:
-
-In this implementation we try to move objects in the image slowly as we are creating the render. As the objects moves, we can average samples(frames) at different times in the animation. The results look super cool:
-
-| Without Motion Blur | With Motion Blur |
-| ------------- | ----------- |
-| ![](img/wo_MB.png)  | ![](img/w_MB.png) |
-| ---------------->![](img/wo_MB_Z.png)<---------------- | ---------------->![](img/w_MB_Z.png)<----------------|
+| ![](images/dragon_cpu.gif)  | ![](images/dragon_gpu.gif) |
 
 
 ## Perfomance Implementation and Analysis:
 
-In the naive approach, we track each rays motion and bounce, throughout its journey until our depth requirement is met. But this is not the best and most efficient way to approach this since many rays will be terminating their journey earlier by either hitting the light source or a diffusing surface.
-
-### Stream Compaction: 
-
-Stream compaction would allow us to get rid of rays that have already terminated by hitting the light source or a diffusing surface. This way we can exit earlier in each iteration thus improving our performance. This is especially useful when our depth is a larger number such as 64. We can see the performance improved significantly as follows (the depth is 8):
-
-
-![](img/SC.png)
-
-
-As you can see the time it takes for each depth decreases as we bounce further and further which is as predicted. This is due to having less and less active rays to track as we bounce further and further. The performance improvement is especially significant when we have an open environment (no surrounding walls) which makes sense since a lot more rays would get eliminated because of space being open. Overall if we have a high depth(32 and above) stream compaction can improve the performance significantly. 
-
-
-### First bounce intersections Caching:
-
-The first bounce (rays leaving the camera) is the same for each frame iteration so we are technically able to calculate the first bounce intersection and cache it in our memory and use it for future frame iteration which can help further improve the performance of the implementation which can be seen in the plot below: 
-
+The comparison above kind of opens the door easily to get to the nitty gritty comparison between the CPU implementation and the GPU one. The table below shows the comparison between the two in the amount of time it takes for each to complete one iteration. (Steps 1 to 5)
 
 <p align="center">
-  <img src="img/Cache.png">
+  <img src="images/table.PNG">
 </p>
 
-
-### Material Sort:
-
-Not every material in the environment is going to be the same when it comes to computational complexity. Some materials (reflective/refractive) have more bounces and thus require more computation when it comes to it. Thus in theory, if we sort our materials by the type of material they are, we can improve the performance even further. But in reality, the material sort seems not to be affecting our performance in the predicted way. There may be two reasons for this: 1. There are not enough materials in the environment for the sort to make a difference, meaning that if there were a lot more materials we could see possible improvements. 2. The time it takes to sort the materials is longer than the possible benefit we get by sorting. 
+As you can see the difference between CPU and GPU is quite drastic! it is around 100 folds! This test was done on around 42000 points(the number of points for the dragon object). As the number of points increases, I expect the performance difference between CPU and GPU to become even more prominent! Now that we know GPU is way better than the CPU implementation, Let's see what blocksize for the GPU would give us the best performance! The chart below shows the performance difference between various block sizes on the GPU. 
 
 <p align="center">
-  <img src="img/MS.png">
+  <img src="images/Plot.PNG">
 </p>
 
-
-## Cool Renders:
-
-These are my Salvador Dali style masterpieces:
-
-![](img/final4.png)
-![](img/final3.png)
-![](img/final.png)
 
 
 ## Bloopers:
 
-Here are some bloopers showing that everyone can and will make mistakes along the way. :)
+Here are some bloopers showing that everyone can and will make mistakes along the way. Please make sure you are doing your math right lol :)
 
-<img src="img/blooper_MB.png" width="280"> <img src="img/blooper_refract.PNG" width="280"> <img src="img/blooper_refract2.PNG" width="280">
+<img src="images/bloop1.gif" width="380"> <img src="images/bloop2.gif" width="380"> 
+
+## Sources:
+
+[ICP_Lecture](http://ais.informatik.uni-freiburg.de/teaching/ss11/robotics/slides/17-icp.pdf)
+
+[Iterative closest point Wiki](https://en.wikipedia.org/wiki/Iterative_closest_point)
+
+[Development of an Inspection System for Defect Detection in Pressed Parts Using Laser Scanned Data](https://www.researchgate.net/figure/a-Illustration-of-registration-process-using-ICP-algorithm-b-Schematic-representation_fig1_275540074)
+
+
