@@ -45,10 +45,6 @@ void count_num_points(std::string filename, int *count) {
 	std::ifstream fp_in;
 	char* fname = (char*)filename.c_str();
 	fp_in.open(fname);
-	if (!fp_in.is_open()) {
-		std::cout << "Error reading from file" << strerror(errno) << std::endl;
-		throw;
-	}
 	*count = 0;
 	while (fp_in.good()) {
 		std::string line;
@@ -61,15 +57,11 @@ void count_num_points(std::string filename, int *count) {
 	}
 
 
-void readfile(std::string filename, int count, glm::vec3* points) {
+void readfile(std::string filename, int count) {
 
 	std::ifstream fp_in;
 	char* fname = (char*)filename.c_str();
 	fp_in.open(fname);
-	if (!fp_in.is_open()) {
-		std::cout << "Error reading from file" << strerror(errno) << std::endl;
-		throw;
-	}
 	int i = 0;
 	while (fp_in.good()) {
 		std::string line;
@@ -80,9 +72,9 @@ void readfile(std::string filename, int count, glm::vec3* points) {
 			std::vector<std::string> tokens = utilityCore::tokenizeString(line);
 			glm::vec3 point = glm::vec3 (atof(tokens[0].c_str()), atof(tokens[1].c_str()), atof(tokens[2].c_str()));
 			//printf("%f,%f,%f\n", points[i].x, points[i].y, points[i].z);
-			points[i] = point;
-			//first_points[i] = glm::vec3(firstTransform * glm::vec4(point, 1));
-			//second_points[i] = glm::vec3(secondTransform * glm::vec4(point, 1));
+			//points[i] = point;
+			first_points[i] = glm::vec3(firstTransform * glm::vec4(point, 1));
+			second_points[i] = glm::vec3(secondTransform * glm::vec4(point, 1));
 			i++;
 
 			
@@ -100,7 +92,7 @@ int main(int argc, char* argv[]) {
  
   glm::vec3 t2(0.0f, 0.0f, +0.3f);
   glm::vec3 r2(0.5f, 0.0f, 0.0f);
-  glm::vec3 s2(2, 2, 2);
+  glm::vec3 s2(2.4, 2.4, 2.4);
 
   firstTransform = utilityCore::buildTransformationMatrix(t2, r2, s2);
 
@@ -111,8 +103,8 @@ int main(int argc, char* argv[]) {
   secondTransform = utilityCore::buildTransformationMatrix(t, r, s);
 
 
-  std::string file1 = "S:\\CIS 565\\Project4-Scan-Matching\\data\\bunny045.txt";
-  std::string file2 = "S:\\CIS 565\\Project4-Scan-Matching\\data\\bunny000.txt";
+  std::string file1 = "S:\\CIS 565\\Project4-Scan-Matching\\data\\dragonStandRight.txt";
+  std::string file2 = "S:\\CIS 565\\Project4-Scan-Matching\\data\\dragonStandRight.txt";
 
   count_num_points(file1, &N_first);
   count_num_points(file2, &N_second);
@@ -121,8 +113,9 @@ int main(int argc, char* argv[]) {
   first_points = (glm::vec3*)malloc(N_first * sizeof(glm::vec3));
   second_points = (glm::vec3*)malloc(N_second * sizeof(glm::vec3));
 
-  readfile(file1, N_first, first_points);
-  readfile(file2, N_second, second_points);
+  //readfile(file1, N_first, first_points);
+  //readfile(file2, N_second, second_points);
+  readfile(file2, N_second);
 
   
   printf("%d \n", N_second);
@@ -329,7 +322,7 @@ void mainLoop() {
   int iter = 0;
   while (!glfwWindowShouldClose(window)) {
     std::cout << "\nIter\t" << iter++ << std::endl;
-    if (iter >= 200)
+    if (iter >= 150)
       break;
     glfwPollEvents();
 
