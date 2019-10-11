@@ -322,7 +322,7 @@ void mainLoop() {
   int iter = 0;
   while (!glfwWindowShouldClose(window)) {
     std::cout << "\nIter\t" << iter++ << std::endl;
-    if (iter >= 150)
+    if (iter >= 65)
       break;
     glfwPollEvents();
 
