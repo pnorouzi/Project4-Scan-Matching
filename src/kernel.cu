@@ -8,6 +8,7 @@
 #include "device_launch_parameters.h"
 #include <glm/gtc/type_ptr.hpp>
 #include "svd3.h"
+#include <time.h>
 
 // LOOK-2.1 potentially useful for doing grid-based neighbor search
 #ifndef imax
@@ -65,11 +66,10 @@ void checkCUDAError(const char *msg, int line = -1) {
 int numObjects;
 dim3 threadsPerBlock(blockSize);
 
-// LOOK-1.2 - These buffers are here to hold all your boid information.
-// These get allocated for you in ScanMatching::initSimulation.
-// Consider why you would need two velocity buffers in a simulation where each
-// boid cares about its neighbors' velocities.
-// These are called ping-pong buffers.
+clock_t timer;
+double time_per_iter = 0;
+
+
 glm::vec3 *dev_pos;
 glm::vec3 *dev_color;
 
@@ -290,6 +290,8 @@ __global__ void update(int N_first, glm::vec3 *dev_first, glm::mat3 dev_rot, glm
 }
 
 void scanmatch::run_GPU(int N_first, int N_second) {
+	
+	timer = clock();
 
 	dim3 numBlocks_first((N_first + blockSize - 1) / blockSize);
 
@@ -339,13 +341,18 @@ void scanmatch::run_GPU(int N_first, int N_second) {
 	
 
 	
-	printf("here \n");
-	glm::vec3 host_trans = mean_corr - (host_rot *mean_first);
-	printf("here \n");
+	glm::vec3 host_trans = -mean_corr - (mean_first* host_rot);
 
 	
 	update << <numBlocks_first, blockSize >> > (N_first, dev_first, host_rot, host_trans);
 	//update << <numBlocks_first, blockSize >> > (N_first, dev_first, R, T, dev_pos);
+
+
+	timer = clock() - timer;
+	time_per_iter = ((double)timer) / CLOCKS_PER_SEC;
+	
+	printf("(Time per Iter : %f \n", time_per_iter);
+
 
 	cudaMemcpy(dev_pos, dev_first, N_first * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
 	checkCUDAErrorWithLine("cudaMemcpy failed!");
@@ -389,16 +396,20 @@ void find_mean(int n, glm::vec3 *idata, glm::vec3 host_mean) {
 }
 
 void scanmatch::run_CPU(int N_first, int N_second, glm::vec3* first_points, glm::vec3* second_points) {
+	
+	
 	//printf("here /n");
 	glm::vec3* host_corr = (glm::vec3*)malloc(N_first * sizeof(glm::vec3));
 	//printf("here /n");
+
+	timer = clock();
+
 	findmatch_cpu(N_first, N_second, first_points, second_points, host_corr);
 	
 	
 	
 	glm::vec3 host_mean_first(0.0f, 0.0f, 0.0f);
 	glm::vec3 host_mean_corr(0.0f, 0.0f, 0.0f);
-	
 
 	for (int i = 0; i <N_first; i++) {
 
@@ -409,7 +420,6 @@ void scanmatch::run_CPU(int N_first, int N_second, glm::vec3* first_points, glm:
 	host_mean_first /= N_first;
 	host_mean_corr /= N_first;
 	
-	printf("%f,%f,%f\n", host_mean_corr.x, host_mean_corr.y, host_mean_corr.z);
 
 	//glm::mat3 W;
 	float W[3][3] = { 0 };
@@ -423,8 +433,7 @@ void scanmatch::run_CPU(int N_first, int N_second, glm::vec3* first_points, glm:
 	}
 	
 
-	printf("%f \n", W[2][1]);
-	printf("%f \n", W[2][2]);
+	
 	//glm::mat3 U;
 	//glm::mat3 U = new glm::mat3[1];
 	//glm::mat3 S;
@@ -439,8 +448,6 @@ void scanmatch::run_CPU(int N_first, int N_second, glm::vec3* first_points, glm:
 		S[0][0], S[0][1], S[0][2], S[1][0], S[1][1], S[1][2], S[2][0], S[2][1], S[2][2],
 		V[0][0], V[0][1], V[0][2], V[1][0], V[1][1], V[1][2], V[2][0], V[2][1], V[2][2]);
 
-	printf("%f \n", U[2][1]);
-	printf("%f \n", S[2][2]);
 	//printf("%f \n", V[3][3]);
 
 	glm::mat3 host_U =  glm::mat3(glm::vec3(U[0][0], U[1][0], U[2][0]), glm::vec3(U[0][1], U[1][1], U[2][1]), glm::vec3(U[0][2], U[1][2], U[2][2]));
@@ -455,9 +462,14 @@ void scanmatch::run_CPU(int N_first, int N_second, glm::vec3* first_points, glm:
 		first_points[i] = (host_rot * first_points[i]) + host_trans;
 	}
 
+	timer = clock() - timer;
+	time_per_iter = ((double)timer) / CLOCKS_PER_SEC;
+
 	cudaMemcpy(dev_pos, first_points, N_first * sizeof(glm::vec3), cudaMemcpyHostToDevice);
 	checkCUDAErrorWithLine("copyDev_pos failed!");
+	
 
+	printf("(Time per Iter : %f \n", time_per_iter);
 }
 
 
